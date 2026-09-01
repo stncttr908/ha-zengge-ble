@@ -333,17 +333,10 @@ class ZenggePayloadBuilder:
 
     @classmethod
     def set_cct(cls, cct_percent: int, brightness: int = 100) -> bytes:
-        """Sets color temperature using standard MagicHome WW/CW PWM channels."""
-        cct_pct = max(0, min(100, int(cct_percent)))
-        bri_pct = max(1, min(100, int(brightness)))
-        
-        # Balance Warm White (0% CCT) vs Cool White (100% CCT)
-        cct_ratio = cct_pct / 100.0
-        bri_factor = (bri_pct / 100.0) * 255.0
-        warm = int(round((1.0 - cct_ratio) * bri_factor))
-        cold = int(round(cct_ratio * bri_factor))
-        
-        return cls.set_white(warm, cold)
+        """HagallBjarkan 0xB1 CCT command matching live app captures."""
+        cct = max(0, min(100, int(cct_percent)))
+        bri = max(1, min(100, int(brightness)))
+        return bytes([0xE0, 0x01, 0x00, 0xB1, 0x00, 0x00, 0x00, cct, bri, 0x00, 0x00, 0x14, 0x00, 0x00])
 
     @classmethod
     def set_white(cls, warm: int, cold: int) -> bytes:
@@ -354,18 +347,9 @@ class ZenggePayloadBuilder:
         return bytes(cmd)
 
     @classmethod
-    def set_scene_magichome(cls, mode_id: int, speed: int = 16) -> bytes:
-        """Standard MagicHome hardware dynamic animation frame (0xBB <mode> <speed> 0x44 <checksum>)."""
-        spd = max(1, min(31, int(speed)))
-        cmd = bytearray([0xBB, mode_id & 0xFF, spd, 0x44])
-        cmd.append(cls._checksum(cmd))
-        return bytes(cmd)
-
-    @classmethod
     def set_scene(cls, scene_id: int, speed: int = 16) -> bytes:
-        """Constructs a HagallBjarkan native firmware scene activation frame (0xE0 0x02 0x00 ...)."""
-        speed_val = max(1, min(31, int(speed)))
-        return bytes([0xE0, 0x02, 0x00, scene_id & 0xFF, speed_val, 0xFF])
+        """HagallBjarkan native firmware scene activation frame matching live app captures."""
+        return bytes([0xE0, 0x02, 0x00, scene_id & 0xFF, 0xFF, 0xFF])
 
 
 class ZenggeLampDevice:

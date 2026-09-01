@@ -22,9 +22,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    AMBIENCE_PRESETS,
     DOMAIN,
-    DYNAMIC_SCENES,
     EFFECT_LIST,
     EFFECT_NAME_TO_ID,
     EFFECT_SLUG_TO_ID,
@@ -48,7 +46,7 @@ async def async_setup_entry(
 
 
 class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightEntity):
-    """Representation of a Zengge BLE Smart Lamp entity."""
+    """Representation of a Zengge HagallBjarkan BLE Light entity."""
 
     _attr_has_entity_name = True
     _attr_name = None
@@ -135,6 +133,16 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
                 return preset[0]
         return self._optimistic_effect
 
+    def _get_active_brightness_percent(self, kwargs: dict[str, Any]) -> int:
+        """Helper to resolve active brightness percent (1..100)."""
+        if ATTR_BRIGHTNESS in kwargs:
+            return max(1, min(100, int(round((kwargs[ATTR_BRIGHTNESS] / 255.0) * 100))))
+        if self.coordinator.data and self.coordinator.data.brightness > 0:
+            return max(1, min(100, self.coordinator.data.brightness))
+        if self._optimistic_brightness and self._optimistic_brightness > 0:
+            return max(1, min(100, int(round((self._optimistic_brightness / 255.0) * 100))))
+        return 100
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on with optional attributes."""
         device = self.coordinator.device
@@ -143,60 +151,28 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
 
         if ATTR_EFFECT in kwargs:
             effect_name = kwargs[ATTR_EFFECT]
-            self._optimistic_effect = effect_name
-            
-            if effect_name in DYNAMIC_SCENES:
-                cfg = DYNAMIC_SCENES[effect_name]
-                stype = cfg.get("type", "magichome")
-                mode_id = int(cfg["mode_id"])
-                speed = int(cfg.get("speed", 16))
-                _LOGGER.debug("Activating dynamic animation %s (type=%s, mode=0x%02X, speed=%d)", effect_name, stype, mode_id, speed)
-                if stype == "magichome":
-                    new_status = await device.set_scene_magichome(mode_id, speed)
-                else:
-                    new_status = await device.set_scene(mode_id, speed)
-
-            elif effect_name in AMBIENCE_PRESETS:
-                cfg = AMBIENCE_PRESETS[effect_name]
-                ptype = cfg.get("type", "cct")
-                _LOGGER.debug("Activating ambience preset %s (type=%s)", effect_name, ptype)
-                if ptype == "cct":
-                    cct_pct = int(cfg["cct_pct"])
-                    bri = int(cfg.get("bri", 100))
-                    self._optimistic_mode = ColorMode.COLOR_TEMP
-                    new_status = await device.set_cct(cct_pct, bri)
-                elif ptype == "hsv":
-                    hue = int(cfg["hue"])
-                    sat = int(cfg["sat"])
-                    bri = int(cfg.get("bri", 100))
-                    self._optimistic_mode = ColorMode.HS
-                    self._optimistic_hs = (float(hue), float(sat))
-                    new_status = await device.set_hsv(hue, sat, bri)
-
+            scene_id = EFFECT_NAME_TO_ID.get(effect_name) or EFFECT_SLUG_TO_ID.get(effect_name.lower())
+            if scene_id is not None:
+                _LOGGER.debug("Activating scene %s (ID: 0x%02X)", effect_name, scene_id)
+                self._optimistic_effect = effect_name
+                new_status = await device.set_scene(scene_id)
             else:
-                scene_id = EFFECT_NAME_TO_ID.get(effect_name) or EFFECT_SLUG_TO_ID.get(effect_name.lower())
-                if scene_id is not None:
-                    _LOGGER.debug("Activating legacy scene %s (ID: 0x%02X)", effect_name, scene_id)
-                    new_status = await device.set_scene_magichome(scene_id, 16)
-                else:
-                    _LOGGER.warning("Unknown effect requested: %s", effect_name)
-                    new_status = await device.power_on()
+                _LOGGER.warning("Unknown effect requested: %s", effect_name)
+                new_status = await device.power_on()
 
         elif ATTR_HS_COLOR in kwargs:
             hue, sat = kwargs[ATTR_HS_COLOR]
-            if ATTR_BRIGHTNESS in kwargs:
-                bri = max(1, int(round((kwargs[ATTR_BRIGHTNESS] / 255.0) * 100)))
-            else:
-                bri = self.coordinator.data.brightness if self.coordinator.data else 100
-            _LOGGER.debug("Setting HS color: Hue=%.1f, Sat=%.1f, Bri=%d%%", hue, sat, bri)
+            bri_pct = self._get_active_brightness_percent(kwargs)
+            _LOGGER.debug("Setting HS color: Hue=%.1f, Sat=%.1f, Bri=%d%%", hue, sat, bri_pct)
             self._optimistic_hs = (float(hue), float(sat))
-            self._optimistic_brightness = int(round((bri / 100.0) * 255))
+            self._optimistic_brightness = int(round((bri_pct / 100.0) * 255))
             self._optimistic_mode = ColorMode.HS
             self._optimistic_effect = None
-            new_status = await device.set_hsv(int(round(hue)) % 360, int(round(sat)), bri)
+            new_status = await device.set_hsv(int(round(hue)) % 360, int(round(sat)), bri_pct)
 
         elif ATTR_RGB_COLOR in kwargs:
             r, g, b = kwargs[ATTR_RGB_COLOR]
+            bri_pct = self._get_active_brightness_percent(kwargs)
             _LOGGER.debug("Setting RGB color: (%d, %d, %d)", r, g, b)
             self._optimistic_mode = ColorMode.HS
             self._optimistic_effect = None
@@ -206,19 +182,16 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
             kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
             clamped_kelvin = max(MIN_COLOR_TEMP_KELVIN, min(MAX_COLOR_TEMP_KELVIN, kelvin))
             cct_pct = int(round(((clamped_kelvin - MIN_COLOR_TEMP_KELVIN) / (MAX_COLOR_TEMP_KELVIN - MIN_COLOR_TEMP_KELVIN)) * 100))
-            if ATTR_BRIGHTNESS in kwargs:
-                bri = max(1, int(round((kwargs[ATTR_BRIGHTNESS] / 255.0) * 100)))
-            else:
-                bri = self.coordinator.data.brightness if self.coordinator.data else 100
-            _LOGGER.debug("Setting CCT: Kelvin=%d -> %d%%, Bri=%d%%", clamped_kelvin, cct_pct, bri)
+            bri_pct = self._get_active_brightness_percent(kwargs)
+            _LOGGER.debug("Setting CCT: Kelvin=%d -> %d%%, Bri=%d%%", clamped_kelvin, cct_pct, bri_pct)
             self._optimistic_cct = clamped_kelvin
-            self._optimistic_brightness = int(round((bri / 100.0) * 255))
+            self._optimistic_brightness = int(round((bri_pct / 100.0) * 255))
             self._optimistic_mode = ColorMode.COLOR_TEMP
             self._optimistic_effect = None
-            new_status = await device.set_cct(cct_pct, bri)
+            new_status = await device.set_cct(cct_pct, bri_pct)
 
         elif ATTR_BRIGHTNESS in kwargs:
-            bri_pct = max(1, int(round((kwargs[ATTR_BRIGHTNESS] / 255.0) * 100)))
+            bri_pct = max(1, min(100, int(round((kwargs[ATTR_BRIGHTNESS] / 255.0) * 100))))
             _LOGGER.debug("Setting brightness: %d%%", bri_pct)
             self._optimistic_brightness = kwargs[ATTR_BRIGHTNESS]
             new_status = await device.set_brightness(bri_pct)

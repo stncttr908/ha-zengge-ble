@@ -1,7 +1,7 @@
 # Zengge / MagicHome BLE Smart Lamp Home Assistant Integration
 
 <p align="center">
-  <img src="images/icon.png" alt="Zengge BLE Smart Light Icon" width="160" height="160" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);"/>
+  <img src="https://raw.githubusercontent.com/stncttr908/ha-zengge-ble/main/images/icon.png" alt="Zengge BLE Smart Light Icon" width="160" height="160" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);"/>
 </p>
 
 <p align="center">

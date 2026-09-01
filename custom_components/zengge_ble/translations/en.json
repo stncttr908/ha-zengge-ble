@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select Zengge BLE Device",
+        "description": "Choose a discovered Zengge BLE Smart Lamp or enter a MAC address manually.",
+        "data": {
+          "address": "Device"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Set up Zengge BLE Device",
+        "description": "Do you want to set up {name}?"
+      },
+      "manual": {
+        "title": "Manual Device Configuration",
+        "description": "Enter the Bluetooth MAC address of your Zengge HagallBjarkan lamp.",
+        "data": {
+          "address": "Bluetooth MAC Address",
+          "name": "Custom Name (Optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_mac": "Invalid Bluetooth MAC address. Please use the format XX:XX:XX:XX:XX:XX.",
+      "cannot_connect": "Failed to connect to the Bluetooth device. Please ensure the lamp is powered on and within range."
+    },
+    "abort": {
+      "already_configured": "Device is already configured in Home Assistant.",
+      "already_in_progress": "Configuration flow is already in progress for this device.",
+      "no_devices_found": "No unconfigured Zengge BLE devices found nearby."
+    }
+  }
+}

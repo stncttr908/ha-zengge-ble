@@ -1,0 +1,20 @@
+{
+  "domain": "zengge_ble",
+  "name": "Zengge BLE Smart Light",
+  "codeowners": ["@stncttr908"],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/stncttr908/ha-zengge-ble",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "1.0.0",
+  "bluetooth": [
+    {
+      "service_uuid": "0000ffff-0000-1000-8000-00805f9b34fb"
+    },
+    {
+      "local_name": "IOTBT*"
+    }
+  ]
+}

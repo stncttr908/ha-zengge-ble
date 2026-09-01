@@ -357,6 +357,58 @@ class ZenggePayloadBuilder:
         return bytes([0xE0, 0x02, 0x00, scene_id & 0xFF, 0xFF, 0xFF])
 
 
+# Multi-step color patterns for HagallBjarkan dynamic hardware animations
+SCENE_PATTERNS: dict[int, bytes] = {
+    # 0x2C: Authentic Warm Amber & Red Flame Pattern (8 steps from bugreport capture)
+    0x2C: bytes.fromhex(
+        "E004006408"
+        "0103A106646401001400530000"
+        "0203A100641401002100690000"
+        "0303A100644E01003200620000"
+        "0403A106E41B01001E00670000"
+        "0503A105644701001400690000"
+        "0603A1006434010014009A0000"
+        "0703A107645101001400660000"
+        "0803A107E42701001400660000"
+    ),
+    # 0x25: 3-Color Dynamic Gradient (Red -> Green -> Blue)
+    0x25: bytes.fromhex(
+        "E004006403"
+        "0103A100646401002000500000"
+        "0203A13C646401002000500000"
+        "0303A178646401002000500000"
+    ),
+    # 0x26: 5-Color Dynamic Jump (Red -> Yellow -> Green -> Cyan -> Blue)
+    0x26: bytes.fromhex(
+        "E004006405"
+        "0103A100646401001000300000"
+        "0203A11E646401001000300000"
+        "0303A13C646401001000300000"
+        "0403A15A646401001000300000"
+        "0503A178646401001000300000"
+    ),
+    # 0x27: Colorful Breath (Red -> Blue -> Green breathing)
+    0x27: bytes.fromhex(
+        "E004006403"
+        "0103A100646401003000300000"
+        "0203A178646401003000300000"
+        "0303A13C646401003000300000"
+    ),
+    # 0x28: Heartbeat Pulse
+    0x28: bytes.fromhex(
+        "E004006402"
+        "0103A100646401001000100000"
+        "0203A100641401001000100000"
+    ),
+    # 0x29: Lightning Strobe
+    0x29: bytes.fromhex(
+        "E004006402"
+        "0103A178206401000800080000"
+        "0203A100000001000800080000"
+    ),
+}
+
+
 class ZenggeLampDevice:
     """Asynchronous device controller interfacing with BleakClient and BLEDevice."""
 
@@ -613,10 +665,17 @@ class ZenggeLampDevice:
         elif status and status.channel_mode == "WHITE":
             return await self.set_cct(status.cool_white, brightness_percent)
         else:
-            val = int((brightness_percent / 100.0) * 255)
-            return await self.send_command(ZenggePayloadBuilder.set_white(val, val), wait_response=True)
+            return await self.set_cct(0, brightness_percent)
 
     async def set_scene(self, scene_id: int, speed: int = 16) -> Optional[ZenggeDeviceStatus]:
+        """Activate scene with multi-step color sequence upload if defined."""
+        pattern = SCENE_PATTERNS.get(scene_id)
+        if pattern:
+            try:
+                await self.send_command(pattern, wait_response=False)
+                await asyncio.sleep(0.04)
+            except Exception as pat_err:
+                _LOGGER.debug("Pattern upload on %s: %s", self._address, pat_err)
         return await self.send_command(ZenggePayloadBuilder.set_scene(scene_id, speed), wait_response=True)
 
     async def set_scene_magichome(self, mode_id: int, speed: int = 16) -> Optional[ZenggeDeviceStatus]:

@@ -51,6 +51,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ) -> None:
         """Update BLEDevice object when new advertisement arrives."""
         coordinator.update_ble_device(service_info.device)
+        if coordinator.data is None:
+            hass.async_create_task(coordinator.async_request_refresh())
 
     entry.async_on_unload(
         bluetooth.async_register_callback(

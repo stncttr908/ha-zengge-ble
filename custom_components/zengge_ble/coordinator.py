@@ -61,5 +61,12 @@ class ZenggeDataUpdateCoordinator(DataUpdateCoordinator[Optional[ZenggeDeviceSta
         self.device.set_ble_device(ble_device)
 
     async def _async_update_data(self) -> Optional[ZenggeDeviceStatus]:
-        """Return current status without executing invasive query commands."""
+        """Establish connection and query initial status on startup."""
+        if not self.device.is_connected:
+            try:
+                connected = await self.device.connect()
+                if connected and not self.device.status:
+                    await self.device.query_status()
+            except Exception as err:
+                _LOGGER.debug("Initial startup query for %s: %s", self.ble_device.address, err)
         return self.device.status

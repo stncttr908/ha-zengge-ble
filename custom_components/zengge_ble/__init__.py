@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
+import sys
 from typing import Final
 
 from homeassistant.components import bluetooth
@@ -11,6 +13,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
+
+# Dynamic submodule refresh on reload
+for mod_name in list(sys.modules.keys()):
+    if mod_name.startswith("custom_components.zengge_ble.") and not mod_name.endswith(".config_flow"):
+        try:
+            importlib.reload(sys.modules[mod_name])
+        except Exception:
+            pass
 
 from .const import DOMAIN
 from .coordinator import ZenggeDataUpdateCoordinator

@@ -214,6 +214,10 @@ This entire integration, protocol engine, and test harness was **100% vibe coded
 * **🐳 Isolated OrbStack Test Harness (`ha-test`)**: Provisioned an isolated Docker testbed running Home Assistant Core paired with an ESP32 Active Bluetooth Proxy to autonomously validate real-world proxy roaming, MTU negotiation, and zero-mDNS leakage without disturbing production IoT infrastructure.
 * **🛡️ 100% Test Coverage & Protocol Invariants**: Standalone regression test suite (48/48 tests passing) verifying packet serialization, telemetry reassembly, optimistic state transitions, and `bleak-retry-connector` reliability.
 
+### 🥩 Meat Proxy™ Hardware Operator Credit
+
+Special credit and gratitude to **[@stncttr908](https://github.com/stncttr908)** for serving as the dedicated **Meat Proxy™** throughout this research—faithfully plugging in USB cables, power-cycling power strips, generating Android bugreports, and pressing physical capacitive touch buttons whenever AI agentic autonomy hit the physical barrier of meatspace.
+
 ---
 
 ## 📄 License

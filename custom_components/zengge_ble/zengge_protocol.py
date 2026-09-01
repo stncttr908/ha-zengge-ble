@@ -14,6 +14,12 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
 
+try:
+    from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
+    HAVE_BLEAK_RETRY_CONNECTOR = True
+except ImportError:
+    HAVE_BLEAK_RETRY_CONNECTOR = False
+
 from .const import (
     CMD_ID_APP,
     DEFAULT_COMMAND_TIMEOUT,
@@ -533,8 +539,17 @@ class ZenggeLampDevice:
 
             _LOGGER.debug("Connecting to Zengge lamp %s (timeout=%.1fs)", self._address, timeout)
             try:
-                self.client = BleakClient(target, timeout=timeout)
-                await self.client.connect()
+                if HAVE_BLEAK_RETRY_CONNECTOR and isinstance(target, BLEDevice):
+                    client_cls = BleakClientWithServiceCache if "BleakClientWithServiceCache" in globals() else BleakClient
+                    self.client = await establish_connection(
+                        client_cls,
+                        target,
+                        self.name,
+                        max_attempts=3,
+                    )
+                else:
+                    self.client = BleakClient(target, timeout=timeout)
+                    await self.client.connect()
 
                 if not self.client.is_connected:
                     _LOGGER.warning("Failed to establish BLE connection to %s", self._address)
@@ -588,15 +603,18 @@ class ZenggeLampDevice:
     def _on_notification(self, sender: Any, data: bytearray) -> None:
         """Handle incoming GATT notifications on 0xFF02."""
         raw = bytes(data)
+        _LOGGER.debug("Inbound GATT notification raw on %s (len=%d): %s", self._address, len(raw), raw.hex())
         upper = self._decoder.decode(raw)
         if upper and upper.payload:
             try:
                 payload_str = upper.payload.decode("utf-8")
+                _LOGGER.debug("Decoded Upper payload on %s: %s", self._address, payload_str)
                 res = json.loads(payload_str)
                 hex_payload = res.get("payload", "")
                 status = ZenggeDeviceStatus.from_hex_payload(hex_payload)
                 if status:
                     self._latest_status = status
+                    _LOGGER.debug("Parsed telemetry status on %s: power=%s, mode=%s, bri=%s", self._address, status.power, status.mode_name, status.brightness)
                     if self._status_future and not self._status_future.done():
                         self._status_future.set_result(status)
                     for cb in list(self._callbacks):
@@ -606,6 +624,8 @@ class ZenggeLampDevice:
                             _LOGGER.error("Error in status callback: %s", cb_err)
             except Exception as parse_err:
                 _LOGGER.debug("Error parsing notification JSON: %s", parse_err)
+        elif upper is None:
+            _LOGGER.debug("Failed to decode LowerTransportLayer frame from raw: %s", raw.hex())
 
     async def send_command(
         self,

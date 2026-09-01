@@ -65,8 +65,14 @@ class ZenggeDataUpdateCoordinator(DataUpdateCoordinator[Optional[ZenggeDeviceSta
         if not self.device.is_connected:
             try:
                 connected = await self.device.connect()
-                if connected and not self.device.status:
-                    await self.device.query_status()
+                if connected:
+                    # Give proxy a moment to receive initial notification or query status
+                    await asyncio.sleep(0.2)
+                    if not self.device.status:
+                        _LOGGER.debug("Sending startup status query to %s", self.ble_device.address)
+                        status = await self.device.query_status()
+                        if status:
+                            return status
             except Exception as err:
                 _LOGGER.debug("Initial startup query for %s: %s", self.ble_device.address, err)
         return self.device.status

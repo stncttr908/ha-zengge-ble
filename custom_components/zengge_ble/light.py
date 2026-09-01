@@ -17,8 +17,10 @@ from homeassistant.components.light import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.const import STATE_ON
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -45,7 +47,7 @@ async def async_setup_entry(
     async_add_entities([ZenggeHBLightEntity(coordinator, entry)])
 
 
-class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightEntity):
+class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightEntity, RestoreEntity):
     """Representation of a Zengge HagallBjarkan BLE Light entity."""
 
     _attr_has_entity_name = True
@@ -65,12 +67,29 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.unique_id or coordinator.ble_device.address}_light"
-        self._optimistic_is_on: Optional[bool] = None
-        self._optimistic_brightness: Optional[int] = None
-        self._optimistic_hs: Optional[tuple[float, float]] = None
-        self._optimistic_cct: Optional[int] = None
+        self._optimistic_is_on: bool = False
+        self._optimistic_brightness: int = 255
+        self._optimistic_hs: tuple[float, float] = (0.0, 0.0)
+        self._optimistic_cct: int = 4000
         self._optimistic_effect: Optional[str] = None
-        self._optimistic_mode: ColorMode = ColorMode.HS
+        self._optimistic_mode: ColorMode = ColorMode.COLOR_TEMP
+
+    async def async_added_to_hass(self) -> None:
+        """Restore previous state on reload or boot."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state and self.coordinator.data is None:
+            self._optimistic_is_on = (last_state.state == STATE_ON)
+            if last_state.attributes.get(ATTR_BRIGHTNESS) is not None:
+                self._optimistic_brightness = last_state.attributes[ATTR_BRIGHTNESS]
+            if last_state.attributes.get(ATTR_COLOR_TEMP_KELVIN) is not None:
+                self._optimistic_cct = last_state.attributes[ATTR_COLOR_TEMP_KELVIN]
+                self._optimistic_mode = ColorMode.COLOR_TEMP
+            elif last_state.attributes.get(ATTR_HS_COLOR) is not None:
+                self._optimistic_hs = tuple(last_state.attributes[ATTR_HS_COLOR])
+                self._optimistic_mode = ColorMode.HS
+            if last_state.attributes.get(ATTR_EFFECT) is not None:
+                self._optimistic_effect = last_state.attributes[ATTR_EFFECT]
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -86,14 +105,14 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
         )
 
     @property
-    def is_on(self) -> Optional[bool]:
+    def is_on(self) -> bool:
         """Return true if light is on."""
         if self.coordinator.data is not None:
             return self.coordinator.data.power
         return self._optimistic_is_on
 
     @property
-    def brightness(self) -> Optional[int]:
+    def brightness(self) -> int:
         """Return the brightness of this light between 0..255."""
         if self.coordinator.data is not None:
             return int(round((self.coordinator.data.brightness / 100.0) * 255))
@@ -111,18 +130,22 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
     @property
     def hs_color(self) -> Optional[tuple[float, float]]:
         """Return the hue and saturation color value [float, float] (0..360, 0..100)."""
-        if self.coordinator.data is not None and self.coordinator.data.channel_mode == "RGB":
-            return (float(self.coordinator.data.hue), float(self.coordinator.data.saturation))
-        return self._optimistic_hs
+        if self.coordinator.data is not None:
+            if self.coordinator.data.channel_mode == "RGB":
+                return (float(self.coordinator.data.hue), float(self.coordinator.data.saturation))
+            return None
+        return self._optimistic_hs if self._optimistic_mode == ColorMode.HS else None
 
     @property
     def color_temp_kelvin(self) -> Optional[int]:
         """Return the CT color value in Kelvin."""
-        if self.coordinator.data is not None and self.coordinator.data.channel_mode == "WHITE":
-            cct_pct = self.coordinator.data.cool_white
-            kelvin = MIN_COLOR_TEMP_KELVIN + (cct_pct / 100.0) * (MAX_COLOR_TEMP_KELVIN - MIN_COLOR_TEMP_KELVIN)
-            return int(round(kelvin))
-        return self._optimistic_cct
+        if self.coordinator.data is not None:
+            if self.coordinator.data.channel_mode == "WHITE":
+                cct_pct = self.coordinator.data.cool_white
+                kelvin = MIN_COLOR_TEMP_KELVIN + (cct_pct / 100.0) * (MAX_COLOR_TEMP_KELVIN - MIN_COLOR_TEMP_KELVIN)
+                return int(round(kelvin))
+            return None
+        return self._optimistic_cct if self._optimistic_mode == ColorMode.COLOR_TEMP else None
 
     @property
     def effect(self) -> Optional[str]:

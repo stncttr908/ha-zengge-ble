@@ -51,10 +51,10 @@ class TestZenggeLightEntity(unittest.IsolatedAsyncioTestCase):
         self.entity = ZenggeHBLightEntity(self.coordinator, self.entry)
 
     def test_initial_state_none(self):
-        self.assertIsNone(self.entity.is_on)
-        self.assertIsNone(self.entity.brightness)
+        self.assertFalse(self.entity.is_on)
+        self.assertEqual(self.entity.brightness, 255)
         self.assertIsNone(self.entity.hs_color)
-        self.assertIsNone(self.entity.color_temp_kelVIN if hasattr(self.entity, "color_temp_kelVIN") else self.entity.color_temp_kelvin)
+        self.assertEqual(self.entity.color_temp_kelvin, 4000)
         self.assertIsNone(self.entity.effect)
         self.assertEqual(self.entity.unique_id, "AA:BB:CC:DD:EE:FF_light")
 
@@ -101,10 +101,10 @@ class TestZenggeLightEntity(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_turn_on_effect(self):
         await self.entity.async_turn_on(**{ATTR_EFFECT: "Flame"})
-        self.device.set_scene.assert_awaited_once_with(0x2C, current_hue=None, current_sat=None, current_bri=100)
+        self.device.set_scene.assert_awaited_once_with(0x2C, current_hue=0, current_sat=0, current_bri=100)
 
         await self.entity.async_turn_on(**{ATTR_EFFECT: "Breathe"})
-        self.device.set_scene.assert_awaited_with(0x01, current_hue=None, current_sat=None, current_bri=100)
+        self.device.set_scene.assert_awaited_with(0x01, current_hue=0, current_sat=0, current_bri=100)
 
     async def test_async_turn_on_hs_color(self):
         await self.entity.async_turn_on(**{ATTR_HS_COLOR: (120.0, 100.0), ATTR_BRIGHTNESS: 255})

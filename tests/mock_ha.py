@@ -226,6 +226,8 @@ def install_mock_ha():
     ha_const.CONF_ADDRESS = CONF_ADDRESS
     ha_const.CONF_NAME = CONF_NAME
     ha_const.Platform = Platform
+    ha_const.STATE_ON = "on"
+    ha_const.STATE_OFF = "off"
     ha.const = ha_const
 
     ha_exceptions = types.ModuleType("homeassistant.exceptions")
@@ -248,6 +250,15 @@ def install_mock_ha():
     ha_helpers_update.CoordinatorEntity = CoordinatorEntity
     ha_helpers_update.UpdateFailed = Exception
     ha_helpers.update_coordinator = ha_helpers_update
+
+    ha_helpers_restore = types.ModuleType("homeassistant.helpers.restore_state")
+    class RestoreEntity:
+        async def async_get_last_state(self):
+            return None
+        async def async_added_to_hass(self):
+            pass
+    ha_helpers_restore.RestoreEntity = RestoreEntity
+    ha_helpers.restore_state = ha_helpers_restore
 
     ha_helpers_dev = types.ModuleType("homeassistant.helpers.device_registry")
     ha_helpers_dev.DeviceInfo = DeviceInfo
@@ -292,6 +303,7 @@ def install_mock_ha():
     sys.modules["homeassistant.config_entries"] = ha_config_entries
     sys.modules["homeassistant.helpers"] = ha_helpers
     sys.modules["homeassistant.helpers.update_coordinator"] = ha_helpers_update
+    sys.modules["homeassistant.helpers.restore_state"] = ha_helpers_restore
     sys.modules["homeassistant.helpers.device_registry"] = ha_helpers_dev
     sys.modules["homeassistant.helpers.entity_platform"] = ha_helpers_entity_platform
     sys.modules["homeassistant.components"] = ha_components

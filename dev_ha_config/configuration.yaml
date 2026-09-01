@@ -16,7 +16,6 @@ bluetooth:
 
 # Explicitly restrict zeroconf to prevent any outbound interface broadcast
 zeroconf:
-  default_interface: false
   ipv6: false
 
 logger:

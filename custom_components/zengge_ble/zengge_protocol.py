@@ -236,13 +236,18 @@ class ZenggeDeviceStatus:
 
             power = (b[6] == 0x23)
             mode_id = b[7]
+            sub_mode_id = b[8] if len(b) > 8 else 0
+
             mode_name = "Unknown"
-            if mode_id == 0x61:
+            if mode_id in SCENE_PRESETS:
+                mode_name = f"Scene: {SCENE_PRESETS[mode_id][0]}"
+            elif mode_id == 0x70 and sub_mode_id in SCENE_PRESETS:
+                mode_name = f"Scene: {SCENE_PRESETS[sub_mode_id][0]}"
+                mode_id = sub_mode_id
+            elif mode_id == 0x61:
                 mode_name = "Color / CCT"
             elif mode_id == 0x70:
                 mode_name = "White / Static"
-            elif mode_id in SCENE_PRESETS:
-                mode_name = f"Scene: {SCENE_PRESETS[mode_id][0]}"
 
             channel_flag = b[10]
             is_rgb = (channel_flag == 0xF0)

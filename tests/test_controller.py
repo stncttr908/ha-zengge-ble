@@ -101,7 +101,7 @@ class TestTransportLayer(unittest.TestCase):
         st1 = ZenggeDeviceStatus.from_hex_payload(hex1)
         self.assertIsNotNone(st1)
         self.assertTrue(st1.power)
-        self.assertEqual(st1.mode_id, 0x70)
+        self.assertEqual(st1.mode_id, 0x02)
         self.assertEqual(st1.channel_mode, "RGB")
         self.assertEqual(st1.saturation, 100)
         self.assertEqual(st1.brightness, 100)

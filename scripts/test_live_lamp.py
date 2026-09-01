@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
 test_live_lamp.py
-Automated end-to-end test:
+Automated end-to-end test against the physical lamp:
 1. Starts BLE listener for IOTBT537 / Zengge lamp
-2. Powers on the Home Assistant outlet (switch.power_strip_switch_3)
-3. Detects the boot beacon in real time
-4. Connects via BleakClient
-5. Tests Power ON, Red, Green, Blue, Brightness, Scenes, and Status Query
+2. Power cycles the outlet if needed
+3. Connects via BleakClient
+4. Tests Power ON, Red, Green, Blue, Brightness, CCT Warm/Cool, Scenes, and Status Query
 """
 
 import asyncio
 import os
 import sys
+import subprocess
 from pathlib import Path
 
 # Add scripts directory
@@ -57,19 +57,18 @@ async def run_live_pipeline():
 
     scanner = BleakScanner(detection_callback=on_detect)
     await scanner.start()
-    console.print("[dim]BLE Scanner listening for boot beacon...[/dim]")
+    console.print("[dim]BLE Scanner listening for boot beacon (10s timeout)...[/dim]")
 
-    # Now trigger power on via Home Assistant REST / CLI or prompt
-    console.print("[yellow]Turning switch.power_strip_switch_3 ON via Home Assistant...[/yellow]")
-    
-    # We will let the parent agent turn it on or use local curl / HA API if token available
-    # Wait for device discovery (timeout 30s)
     try:
-        await asyncio.wait_for(stop_event.wait(), timeout=30.0)
+        await asyncio.wait_for(stop_event.wait(), timeout=10.0)
     except asyncio.TimeoutError:
-        console.print("[red]Timeout: Lamp beacon not detected.[/red]")
-        await scanner.stop()
-        return False
+        console.print("[yellow]Lamp not seen immediately. Waiting a bit more...[/yellow]")
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=15.0)
+        except asyncio.TimeoutError:
+            console.print("[red]Timeout: Lamp beacon not detected.[/red]")
+            await scanner.stop()
+            return False
     finally:
         await scanner.stop()
 
@@ -77,7 +76,7 @@ async def run_live_pipeline():
     console.print(f"[green]✓ Target identified:[/green] {dev.address} ({dev.name})\n")
 
     client = ZenggeLampClient(dev.address, target_device=dev)
-    connected = await client.connect(timeout=10.0)
+    connected = await client.connect(timeout=12.0)
     if not connected:
         console.print("[red]Failed to connect to lamp.[/red]")
         return False
@@ -87,25 +86,25 @@ async def run_live_pipeline():
         console.print("\n[bold yellow]1. Sending Power ON (71 23)...[/bold yellow]")
         st = await client.power_on()
         if st: display_status_panel(st)
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(2.0)
 
         # 2. Set RED
         console.print("\n[bold yellow]2. Setting Color -> PURE RED (#FF0000)...[/bold yellow]")
         st = await client.set_rgb(255, 0, 0)
         if st: display_status_panel(st)
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(2.5)
 
         # 3. Set GREEN
         console.print("\n[bold yellow]3. Setting Color -> PURE GREEN (#00FF00)...[/bold yellow]")
         st = await client.set_rgb(0, 255, 0)
         if st: display_status_panel(st)
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(2.5)
 
         # 4. Set BLUE
         console.print("\n[bold yellow]4. Setting Color -> PURE BLUE (#0000FF)...[/bold yellow]")
         st = await client.set_rgb(0, 0, 255)
         if st: display_status_panel(st)
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(2.5)
 
         # 5. Set Brightness 50%
         console.print("\n[bold yellow]5. Setting Brightness -> 50%...[/bold yellow]")
@@ -117,20 +116,32 @@ async def run_live_pipeline():
         console.print("\n[bold yellow]6. Setting Warm White (CCT 0%, Bri 100%)...[/bold yellow]")
         st = await client.set_cct(0, 100)
         if st: display_status_panel(st)
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(2.5)
 
-        # 7. Rainbow Fade Scene
-        console.print("\n[bold yellow]7. Activating Scene -> Rainbow Fade (Mode 0x25, Speed 16)...[/bold yellow]")
-        st = await client.set_scene(0x25, 16)
+        # 7. Set Cool White
+        console.print("\n[bold yellow]7. Setting Cool White (CCT 100%, Bri 100%)...[/bold yellow]")
+        st = await client.set_cct(100, 100)
         if st: display_status_panel(st)
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(2.5)
 
-        # 8. Query final status
-        console.print("\n[bold yellow]8. Querying Final Status...[/bold yellow]")
+        # 8. Flame Scene
+        console.print("\n[bold yellow]8. Activating Scene -> Custom Flame (Mode 0x2C)...[/bold yellow]")
+        st = await client.set_scene(0x2C)
+        if st: display_status_panel(st)
+        await asyncio.sleep(4.0)
+
+        # 9. Three Color Gradient Scene
+        console.print("\n[bold yellow]9. Activating Scene -> Three Color Gradient (Mode 0x25)...[/bold yellow]")
+        st = await client.set_scene(0x25)
+        if st: display_status_panel(st)
+        await asyncio.sleep(4.0)
+
+        # 10. Query final status
+        console.print("\n[bold yellow]10. Querying Final Status...[/bold yellow]")
         st = await client.query_status()
         if st: display_status_panel(st)
 
-        console.print("\n[bold green]✓ All tests passed successfully![/bold green]")
+        console.print("\n[bold green]✓ All physical lamp tests passed successfully![/bold green]")
         return True
 
     finally:

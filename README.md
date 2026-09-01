@@ -31,13 +31,20 @@ A high-performance, fully reverse-engineered Home Assistant custom integration f
 
 ## 🛠️ Supported Devices & Hardware Reference
 
-Tested and confirmed fully compatible with:
+### ✅ Tested & Confirmed Fully Compatible
 
 * **[Zengge / HagallBjarkan RGB+CCT Ambient Smart Table Lamp (Amazon ASIN: B0CXXWXGG7)](https://www.amazon.com/dp/B0CXXWXGG7)**
   * *Model Identifier*: `IOTBT537` / `DC9F4295-5D03-AA2A-5EF5-6EE6449669A4`
-  * *Features*: Touch-dimming base, dual White (Warm/Cool) + 5050 RGB diode arrays, BLE 5.0 microcontroller.
-* **Zengge / Surplife BLE 5.0 Smart Bulbs & Downlights** (sharing service `0000ffff-0000-1000-8000-00805f9b34fb`).
+  * *Hardware*: Capacitive touch-dimming base, dual Warm/Cool White LED array + 5050 RGB diode array, BLE 5.0 microcontroller.
+  * *Verification*: 100% verified on physical hardware across power control, HSV color wheel, CCT tunable white scaling, 26 native dynamic scenes, and bidirectional local push telemetry.
+
+### ⏳ Expected Compatible (Community Testing Welcome)
+
+* **Zengge / Surplife BLE 5.0 Smart Bulbs, Downlights & Ceiling Fixtures** (sharing service `0000ffff-0000-1000-8000-00805f9b34fb` and the HagallBjarkan protocol).
 * **MagicHome / Zj-BLE LED Strips and Controllers** (both modern HagallBjarkan framed and legacy raw-frame revisions).
+
+> [!NOTE]
+> These devices share the same underlying HagallBjarkan protocol and command set and are expected to work out-of-the-box. If your device behaves unexpectedly or any features do not work, please [open a GitHub issue](https://github.com/stncttr908/ha-zengge-ble/issues) following the guidelines in the [Reporting Issues](#-troubleshooting--reporting-issues) section below!
 
 ---
 
@@ -156,7 +163,42 @@ The integration automatically establishes connections through the nearest ESPHom
   * Bytes 11–13: HSV color parameters (Hue / 2, Saturation %, RGB Brightness %)
   * Bytes 14–15: CCT White parameters (Cool White %, White Brightness %)
 
-Detailed packet breakdown and BTSnoop capture analysis are documented in [`docs/protocol_spec.md`](docs/protocol_spec.md).
+---
+
+## 📋 Troubleshooting & Reporting Issues
+
+If your device does not connect, shows missing controls, or fails to execute effects, please [open a GitHub issue](https://github.com/stncttr908/ha-zengge-ble/issues) and include the following details so we can add support for your hardware revision:
+
+### 1. Device Information
+* **Product Name & Store Link**: Brand, model name, and a link to the store/Amazon listing (even if currently unavailable).
+* **Physical Capabilities**: (e.g. RGB only, RGB + Tunable White CCT, Warm White only, Dimmable).
+* **Original App**: What mobile app was the device originally paired with (Surplife, Magic Home, Magic Home Pro, Zengge, etc.).
+
+### 2. Bluetooth Identification & Discovery Data
+* **Advertised Local Name**: (e.g. `IOTBT537`, `LEDnet_...`, `HB_...`, `Zengge_...`).
+* **Device MAC Address / UUID Prefix**: (e.g. `E4:98:BB:...`).
+* **Advertised Service UUIDs**: (e.g. `0000ffff-0000-1000-8000-00805f9b34fb`).
+
+### 3. Home Assistant Debug Logs
+Enable debug logging for the integration by adding the following to your `configuration.yaml` and restarting Home Assistant (or enabling debug logging via **Settings** > **Devices & Services** > **Zengge BLE Smart Light** > **Enable Debug Logging**):
+
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.zengge_ble: debug
+    bleak_retry_connector: debug
+```
+
+Reproduce the issue, download the diagnostic log, and attach the relevant `custom_components.zengge_ble` log snippet to your issue.
+
+### 4. Telemetry / Raw Notification Payloads (If Available)
+Look for lines in your Home Assistant debug log containing:
+* `Inbound GATT notification raw on ... (len=...): ...`
+* `Decoded Upper payload on ...: {"code":0,"payload":"EA81..."}`
+* `Parsed telemetry status on ...: power=..., mode=..., bri=...`
+
+Sharing these hex payloads allows us to quickly map any new opcode variations, channel flags, or scene IDs for your hardware revision!
 
 ---
 

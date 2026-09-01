@@ -258,3 +258,93 @@ Dependencies: {'trace', 'image_upload', 'llm', 'intent', 'ffmpeg', 'blueprint', 
 2026-09-01 17:37:13.564 INFO (MainThread) [aioesphomeapi.reconnect_logic] Successfully resolved esp32-bluetooth-proxy-55d520 @ 10.10.2.139 in 0.000s
 2026-09-01 17:37:13.620 INFO (MainThread) [aioesphomeapi.reconnect_logic] Successfully connected to esp32-bluetooth-proxy-55d520 @ 10.10.2.139 in 0.056s
 2026-09-01 17:37:13.636 INFO (MainThread) [aioesphomeapi.reconnect_logic] Successful handshake with esp32-bluetooth-proxy-55d520 @ 10.10.2.139 in 0.016s
+2026-09-01 17:37:16.987 INFO (MainThread) [habluetooth.wrappers] E4:98:BB:69:E5:37 - IOTBT537: Found 1 connection path(s), preferred order: esp32-bluetooth-proxy-55d520 (EC:62:60:55:D5:22) (RSSI=-59) (failures=0) (in_progress=0) (slots=3/3 free) (score=-59.0)
+2026-09-01 17:37:19.458 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Resolved GATT on E4:98:BB:69:E5:37: write_char=0000ff01-0000-1000-8000-00805f9b34fb, notify_char=0000ff02-0000-1000-8000-00805f9b34fb
+2026-09-01 17:37:19.559 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Subscribed to telemetry notifications (0000ff02-0000-1000-8000-00805f9b34fb) on E4:98:BB:69:E5:37
+2026-09-01 17:37:19.559 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Initial startup query for E4:98:BB:69:E5:37: name 'asyncio' is not defined
+2026-09-01 17:37:19.559 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Finished fetching zengge_ble_E4:98:BB:69:E5:37 data in 6.578 seconds (success: True)
+2026-09-01 17:37:19.559 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Finished fetching zengge_ble_E4:98:BB:69:E5:37 data in 0.000 seconds (success: True)
+2026-09-01 17:37:19.562 INFO (MainThread) [homeassistant.components.light] Setting up zengge_ble.light
+2026-09-01 17:37:19.570 INFO (MainThread) [homeassistant.bootstrap] Home Assistant initialized in 7.17s
+2026-09-01 17:37:19.571 INFO (MainThread) [homeassistant.core] Starting Home Assistant 2026.8.3
+2026-09-01 17:37:19.578 DEBUG (MainThread) [custom_components.zengge_ble.config_flow] Ignoring non-Zengge provisioning beacon: PROV_9E6C18v (B8:D6:1A:9E:6C:1A)
+2026-09-01 17:37:19.578 DEBUG (MainThread) [custom_components.zengge_ble.config_flow] Discovered Zengge BLE device via Bluetooth: IOTBT537 (E4:98:BB:69:E5:37)
+2026-09-01 17:37:19.592 INFO (SyncWorker_8) [homeassistant.loader] Loaded switchbot from homeassistant.components.switchbot
+2026-09-01 17:37:19.592 INFO (SyncWorker_6) [homeassistant.loader] Loaded kegtron from homeassistant.components.kegtron
+2026-09-01 17:37:19.597 INFO (SyncWorker_4) [homeassistant.loader] Loaded ibeacon from homeassistant.components.ibeacon
+2026-09-01 17:37:19.597 INFO (SyncWorker_5) [homeassistant.loader] Loaded govee_ble from homeassistant.components.govee_ble
+2026-09-01 17:37:19.598 INFO (SyncWorker_0) [homeassistant.loader] Loaded bluetooth_adapters from homeassistant.components.bluetooth_adapters
+2026-09-01 17:37:19.608 INFO (SyncWorker_3) [homeassistant.loader] Loaded shelly from homeassistant.components.shelly
+2026-09-01 17:37:19.617 INFO (SyncWorker_2) [homeassistant.loader] Loaded ruuvi_gateway from homeassistant.components.ruuvi_gateway
+2026-09-01 17:37:19.625 INFO (SyncWorker_6) [homeassistant.loader] Loaded smlight from homeassistant.components.smlight
+2026-09-01 17:37:19.637 INFO (MainThread) [homeassistant.setup] Setting up bluetooth_adapters
+2026-09-01 17:38:42.026 INFO (MainThread) [homeassistant.setup] Setting up switchbot
+2026-09-01 17:38:44.048 INFO (MainThread) [homeassistant.setup] Setting up ibeacon
+2026-09-01 17:38:51.120 DEBUG (MainThread) [custom_components.zengge_ble.light] Turning lamp ON
+2026-09-01 17:38:51.719 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b08000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630384132393541303030303030303030303030303030303030303030303030227d
+2026-09-01 17:38:51.719 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F08A295A000000000000000000000000"}
+2026-09-01 17:38:51.720 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=90
+2026-09-01 17:38:51.720 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:38:51.720 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:38:51.721 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:38:52.243 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b18000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630384132393634303030303030303030303030303030303030303030303030227d
+2026-09-01 17:38:52.243 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F08A2964000000000000000000000000"}
+2026-09-01 17:38:52.243 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=100
+2026-09-01 17:38:52.243 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:38:52.243 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:38:59.072 DEBUG (MainThread) [custom_components.zengge_ble.light] Turning lamp OFF
+2026-09-01 17:39:00.153 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b28000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132343631323734304630384132393634303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:00.153 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A24612740F08A2964000000000000000000000000"}
+2026-09-01 17:39:00.154 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=False, mode=Color / CCT, bri=100
+2026-09-01 17:39:00.154 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=False, mode=Color / CCT
+2026-09-01 17:39:00.154 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:00.154 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:02.340 DEBUG (MainThread) [custom_components.zengge_ble.light] Turning lamp ON
+2026-09-01 17:39:02.676 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b38000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630384132393239303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:02.676 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F08A2929000000000000000000000000"}
+2026-09-01 17:39:02.676 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=41
+2026-09-01 17:39:02.676 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:39:02.676 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:02.676 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:03.184 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b48000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630384132393634303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:03.184 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F08A2964000000000000000000000000"}
+2026-09-01 17:39:03.184 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=100
+2026-09-01 17:39:03.184 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:39:03.184 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:12.885 DEBUG (MainThread) [custom_components.zengge_ble.light] Setting brightness: 20%
+2026-09-01 17:39:13.670 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b58000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630384132393134303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:13.670 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F08A2914000000000000000000000000"}
+2026-09-01 17:39:13.670 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=20
+2026-09-01 17:39:13.670 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:39:13.670 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:13.672 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:17.287 DEBUG (MainThread) [custom_components.zengge_ble.light] Setting brightness: 100%
+2026-09-01 17:39:18.237 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b68000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630384132393634303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:18.238 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F08A2964000000000000000000000000"}
+2026-09-01 17:39:18.238 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=100
+2026-09-01 17:39:18.238 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:39:18.238 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:18.238 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:22.862 DEBUG (MainThread) [custom_components.zengge_ble.light] Setting HS color: Hue=358.0, Sat=97.0, Bri=100%
+2026-09-01 17:39:23.668 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b78000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630423336313634303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:23.668 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F0B36164000000000000000000000000"}
+2026-09-01 17:39:23.668 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=100
+2026-09-01 17:39:23.668 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:39:23.668 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:23.669 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:25.530 DEBUG (MainThread) [custom_components.zengge_ble.light] Setting HS color: Hue=124.0, Sat=97.0, Bri=100%
+2026-09-01 17:39:26.161 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b88000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630334536313634303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:26.161 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F03E6164000000000000000000000000"}
+2026-09-01 17:39:26.161 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=100
+2026-09-01 17:39:26.161 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:39:26.161 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:26.163 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:28.276 DEBUG (MainThread) [custom_components.zengge_ble.light] Setting HS color: Hue=232.0, Sat=98.0, Bri=100%
+2026-09-01 17:39:29.210 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Inbound GATT notification raw on E4:98:BB:69:E5:37 (len=83): 04b98000004b4c0c7b22636f6465223a302c227061796c6f6164223a2245413831303030303045304132333631323734304630373436323634303030303030303030303030303030303030303030303030227d
+2026-09-01 17:39:29.210 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Decoded Upper payload on E4:98:BB:69:E5:37: {"code":0,"payload":"EA8100000E0A23612740F0746264000000000000000000000000"}
+2026-09-01 17:39:29.210 DEBUG (MainThread) [custom_components.zengge_ble.zengge_protocol] Parsed telemetry status on E4:98:BB:69:E5:37: power=True, mode=Color / CCT, bri=100
+2026-09-01 17:39:29.210 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Received push telemetry for E4:98:BB:69:E5:37: power=True, mode=Color / CCT
+2026-09-01 17:39:29.210 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:39:29.211 DEBUG (MainThread) [custom_components.zengge_ble.coordinator] Manually updated zengge_ble_E4:98:BB:69:E5:37 data
+2026-09-01 17:40:32.799 INFO (Recorder) [homeassistant.components.recorder.pool.RecorderPool] Pool recreating
+2026-09-01 17:40:32.904 INFO (MainThread) [aioesphomeapi.reconnect_logic] Processing expected disconnect from ESPHome API for esp32-bluetooth-proxy-55d520 @ 10.10.2.139

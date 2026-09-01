@@ -1,33 +1,42 @@
 # Zengge / MagicHome BLE Smart Lamp Home Assistant Integration
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://home-assistant.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <img src="images/icon.png" alt="Zengge BLE Smart Light Icon" width="160" height="160" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);"/>
+</p>
 
-A high-performance, fully reverse-engineered Home Assistant custom integration for **Zengge / MagicHome Bluetooth Low Energy (BLE)** smart lamps, ambient bulbs, and LED controllers utilizing the **HagallBjarkan** (`com.zengge.hagallbjarkan`) transport protocol.
+<p align="center">
+  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-orange.svg" alt="HACS Custom"></a>
+  <a href="https://home-assistant.io"><img src="https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg" alt="Home Assistant"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+
+A high-performance, fully reverse-engineered Home Assistant custom integration for **Zengge / MagicHome / Surplife Bluetooth Low Energy (BLE)** smart lamps, ambient table lights, bulbs, and LED controllers utilizing the **HagallBjarkan** (`com.zengge.hagallbjarkan`) transport protocol.
 
 ---
 
 ## ✨ Features
 
-- **🚀 Local Push Architecture**: Real-time bidirectional telemetry over GATT characteristic `0xFF02`. Changes made via physical controls or other clients update Home Assistant instantly.
-- **🔍 Auto Discovery**: Native integration with Home Assistant's Bluetooth stack. Discovers lamps advertising `0xFFFF` service or `IOTBT*` names automatically.
-- **📡 ESPHome Bluetooth Proxy Support**: Seamless roaming and multi-room coverage using ESPHome Active Bluetooth Proxies.
-- **🎨 Complete Color & White Control**:
+- **🚀 Real-Time Local Push Telemetry**: Subscribes directly to GATT notifications on `0xFF02`. State changes made via the physical capacitive touch controls or other clients update Home Assistant instantly.
+- **🔍 Native Bluetooth Discovery**: Discovers lamps advertising `0xFFFF` service or `IOTBT*` names automatically via Home Assistant's Bluetooth integration.
+- **📡 Seamless ESPHome Bluetooth Proxy Support**: Uses Home Assistant's native `bleak-retry-connector` for reliable multi-room roaming, slot negotiation, and proxy roaming across ESP32 Active Proxies.
+- **🎨 Complete RGB & CCT White Control**:
   - Full RGB / HSV Color Wheel (`ColorMode.HS`)
-  - Tunable White / CCT (`ColorMode.COLOR_TEMP`) from **2700K** (Warm White) to **6500K** (Cool White)
-  - Smooth brightness scaling ($0\% \dots 100\%$)
-- **🔥 26 Built-In Native Hardware Scenes**: Direct access to all reverse-engineered firmware effect presets (Flame, Breathe, Heartbeat, Colorful, Rainbow, Mediterranean, and more) executed directly on the lamp's microcontroller.
-- **🔒 100% Local & Cloud-Free**: Zero internet connection, zero vendor cloud dependencies, and zero accounts required.
+  - Tunable White / CCT (`ColorMode.COLOR_TEMP`) from **2700K** (Warm White) to **6500K** (Cool White) with independent white brightness scaling ($1\% \dots 100\%$)
+  - Instant hardware-level channel handoff between White and RGB diode arrays
+- **🔥 26 Native Hardware Dynamic Scenes**: Direct access to reverse-engineered firmware effect sequences (Flame, Breathe, Heartbeat, Three-Color Gradient, Lightning, and more) uploaded unfragmented to the lamp's microcontroller.
+- **🔒 100% Local & Cloud-Free**: Zero cloud APIs, zero internet dependencies, zero vendor lock-in, and zero accounts required.
 
 ---
 
-## 🛠️ Supported Devices
+## 🛠️ Supported Devices & Hardware Reference
 
-Tested and confirmed compatible with:
-- **Zengge / MagicHome BLE Ambient Smart Lamps** (e.g. `IOTBT537...`)
-- **Zengge HagallBjarkan RGB+CCT Table Lamps**
-- **MagicHome BLE LED Strips & Bulbs** using service `0000ffff-0000-1000-8000-00805f9b34fb`
+Tested and confirmed fully compatible with:
+
+* **[Zengge / HagallBjarkan RGB+CCT Ambient Smart Table Lamp (Amazon ASIN: B0CXXWXGG7)](https://www.amazon.com/dp/B0CXXWXGG7)**
+  * *Model Identifier*: `IOTBT537` / `DC9F4295-5D03-AA2A-5EF5-6EE6449669A4`
+  * *Features*: Touch-dimming base, dual White (Warm/Cool) + 5050 RGB diode arrays, BLE 5.0 microcontroller.
+* **Zengge / Surplife BLE 5.0 Smart Bulbs & Downlights** (sharing service `0000ffff-0000-1000-8000-00805f9b34fb`).
+* **MagicHome / Zj-BLE LED Strips and Controllers** (both modern HagallBjarkan framed and legacy raw-frame revisions).
 
 ---
 
@@ -37,19 +46,18 @@ Tested and confirmed compatible with:
 
 1. Ensure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance.
 2. In Home Assistant, navigate to **HACS** > **Integrations**.
-3. Click the three dots in the top right corner and select **Custom repositories**.
+3. Click the three dots (top right corner) and select **Custom repositories**.
 4. Add this repository:
    - **Repository URL**: `https://github.com/stncttr908/ha-zengge-ble`
    - **Type**: `Integration`
-5. Click **Add**, then search for **"Zengge BLE Smart Light"**.
-6. Click **Download**, then restart Home Assistant.
+5. Click **Add**, search for **"Zengge BLE Smart Light"**, and click **Download**.
+6. Restart Home Assistant.
 
 ### Option 2: Manual Installation
 
-1. Download the latest release `.zip` from GitHub.
-2. Copy the `custom_components/zengge_ble/` folder into your Home Assistant `<config>/custom_components/` directory:
+1. Copy the `custom_components/zengge_ble/` directory into your Home Assistant installation under `<config>/custom_components/`:
    ```bash
-   config/custom_components/zengge_ble/
+   <config>/custom_components/zengge_ble/
    ├── __init__.py
    ├── config_flow.py
    ├── const.py
@@ -58,33 +66,33 @@ Tested and confirmed compatible with:
    ├── manifest.json
    ├── strings.json
    ├── zengge_protocol.py
+   ├── icon.png
+   ├── logo.png
    └── translations/
        └── en.json
    ```
-3. Restart Home Assistant.
+2. Restart Home Assistant.
 
 ---
 
 ## ⚙️ Configuration & Pairing
 
 ### Automatic Discovery
-1. Turn on power to your Zengge lamp.
+1. Power on your Zengge / Surplife lamp.
 2. In Home Assistant, open **Settings** > **Devices & Services**.
 3. The discovered lamp will appear automatically with a **"Discovered"** card (e.g. `IOTBT537...`).
-4. Click **Configure** and confirm to add the light.
+4. Click **Configure** and confirm to add the entity.
 
 ### Manual Configuration
 1. Go to **Settings** > **Devices & Services** > **Add Integration**.
 2. Search for **"Zengge BLE Smart Light"**.
-3. Select your discovered lamp from the list, or choose **"Manually enter Bluetooth MAC address"** and provide the device's MAC address (e.g. `AA:BB:CC:DD:EE:FF`).
+3. Select your lamp from the discovered list, or choose **"Manually enter Bluetooth MAC address"** and supply the 6-byte hex address (e.g. `E4:98:BB:69:E5:37`).
 
 ---
 
-## 📡 ESPHome Bluetooth Proxy Compatibility
+## 📡 ESPHome Bluetooth Proxy Setup
 
-To control your lamps throughout your home without being limited by the server's onboard Bluetooth range, you can use ESP32-based ESPHome Bluetooth Proxies.
-
-Ensure your ESPHome configuration has `active: true` enabled:
+For whole-home coverage beyond the physical range of your server's onboard Bluetooth, configure any ESP32 with active Bluetooth proxying:
 
 ```yaml
 esp32_ble_tracker:
@@ -95,54 +103,59 @@ bluetooth_proxy:
   active: true
 ```
 
-The integration will automatically connect through the closest proxy with the strongest RSSI signal.
+The integration automatically establishes connections through the nearest ESPHome proxy using `bleak-retry-connector`.
 
 ---
 
 ## 🌈 Native Hardware Scene Catalog
 
-The integration exposes 26 hardware-driven scenes that run autonomously on the device:
-
-| Scene Name | Mode ID | Category | Description |
-| :--- | :--- | :--- | :--- |
-| **Flame** | `0x2C` | Dynamic | Realistic flickering candle / fireplace flame |
-| **Breathe** | `0x01` | Preset | Smooth pulsing breathe cycle |
-| **Three Color Gradient** | `0x25` | Dynamic | Tri-color smooth color wash |
-| **Five Color Jump** | `0x26` | Dynamic | Stepped multi-color jump |
-| **Colorful Breath** | `0x27` | Dynamic | Multi-color breathing cycle |
-| **Heartbeat** | `0x28` | Dynamic | Pulsing rhythmic heartbeat |
-| **Lightning** | `0x29` | Dynamic | Thunderstorm strobe flash |
-| **Step Change** | `0x02` | Preset | Crisp color stepping |
-| **Rhythm Change** | `0x03` | Preset | Musical cadence rhythm shift |
-| **Leisure** | `0x04` | Preset | Warm relaxing atmosphere |
-| **Night Light** | `0x05` | Preset | Dim amber night light |
-| **Good Night** | `0x06` | Preset | Sleep aid sunset fading warm light |
-| **Read** | `0x07` | Preset | High-CRI reading neutral white |
-| **Work** | `0x08` | Preset | Crisp cool daylight for productivity |
-| **Grassland** | `0x09` | Preset | Forest & fresh green tones |
-| **Colorful** | `0x0A` | Preset | Vivid spectrum dynamic cycle |
-| **Dazzling** | `0x0B` | Preset | High-energy dynamic party colors |
-| **Gorgeous** | `0x0C` | Preset | Deep romantic purple & rose blend |
-| **Blue Sky** | `0x0D` | Preset | Crisp azure sky blue |
-| **Sunflower** | `0x0E` | Preset | Vibrant sunflower yellow |
-| **Forest** | `0x0F` | Preset | Deep evergreen forest tones |
-| **Mediterranean** | `0x10` | Preset | Aquamarine ocean gradients |
-| **French Style** | `0x11` | Preset | Soft pastel romantic colors |
-| **American Style** | `0x12` | Preset | Rich saturated primary tones |
-| **Birthday Party** | `0x13` | Preset | Festivity party loop |
-| **Wedding Day** | `0x14` | Preset | Soft warm romantic glow |
+| Scene Name | Mode ID | Execution Engine | Description |
+| :--- | :---: | :--- | :--- |
+| **Custom Flame** | `0x2C` | Dynamic Pattern Upload | Realistic 8-step flickering candle / fireplace flame |
+| **Preset Breathe** | `0x01` | Color-Aware Pattern | Dynamic 2-step pulsing breath matching active color |
+| **Three Color Gradient** | `0x25` | Dynamic Pattern Upload | Tri-color smooth continuous color wash |
+| **Five Color Jump** | `0x26` | Dynamic Pattern Upload | Stepped 5-color jumping transition |
+| **Colorful Breath** | `0x27` | Dynamic Pattern Upload | Multi-color spectrum breathing cycle |
+| **Heartbeat** | `0x28` | Dynamic Pattern Upload | Pulsing rhythmic heartbeat cadence |
+| **Lightning** | `0x29` | Dynamic Pattern Upload | Thunderstorm strobe flash effect |
+| **Step Change** | `0x02` | Built-in ROM Preset | Crisp color stepping |
+| **Rhythm Change** | `0x03` | Built-in ROM Preset | Cadence rhythm shift |
+| **Leisure** | `0x04` | Built-in ROM Preset | Relaxing warm ambient tones |
+| **Night Light** | `0x05` | Built-in ROM Preset | Ultra-dim amber night light |
+| **Good Night** | `0x06` | Built-in ROM Preset | Sunset fade sleep aid lighting |
+| **Read** | `0x07` | Built-in ROM Preset | Neutral 4000K high-clarity reading white |
+| **Work** | `0x08` | Built-in ROM Preset | Crisp 6500K cool daylight for focus |
+| **Grassland** | `0x09` | Built-in ROM Preset | Fresh green palette |
+| **Colorful** | `0x0A` | Built-in ROM Preset | Vivid spectrum dynamic cycle |
+| **Dazzling** | `0x0B` | Built-in ROM Preset | High-energy dynamic party colors |
+| **Gorgeous** | `0x0C` | Built-in ROM Preset | Deep romantic purple & rose blend |
+| **Blue Sky** | `0x0D` | Built-in ROM Preset | Azure sky blue |
+| **Sunflower** | `0x0E` | Built-in ROM Preset | Golden sunflower yellow |
+| **Forest** | `0x0F` | Built-in ROM Preset | Deep evergreen forest tones |
+| **Mediterranean** | `0x10` | Built-in ROM Preset | Aquamarine ocean gradient |
+| **French Style** | `0x11` | Built-in ROM Preset | Soft pastel romantic colors |
+| **American Style** | `0x12` | Built-in ROM Preset | Rich saturated primary tones |
+| **Birthday Party** | `0x13` | Built-in ROM Preset | Party festivity loop |
+| **Wedding Day** | `0x14` | Built-in ROM Preset | Soft warm romantic glow |
 
 ---
 
-## 🔬 Protocol Architecture Summary
+## 🔬 Reverse Engineered Protocol Specs
 
-- **GATT Service**: `0000ffff-0000-1000-8000-00805f9b34fb` (`0xFFFF`)
-- **Write Characteristic**: `0000ff01-0000-1000-8000-00805f9b34fb` (`0xFF01`)
-- **Notify Characteristic**: `0000ff02-0000-1000-8000-00805f9b34fb` (`0xFF02`)
-- **Framing**: Lower Transport Layer header `[Ctrl, Seq, 0x80, 0x00, Len_H, Len_L, Len+1, CmdID, ...Payload]`
-- **Telemetry Payload**: Hex-encoded 26-byte status array encapsulated in UTF-8 JSON notification messages.
+* **Primary GATT Service**: `0000ffff-0000-1000-8000-00805f9b34fb` (`0xFFFF`)
+* **Write Characteristic**: `0000ff01-0000-1000-8000-00805f9b34fb` (`0xFF01`)
+* **Telemetry Characteristic**: `0000ff02-0000-1000-8000-00805f9b34fb` (`0xFF02`)
+* **Transport Framing**: `[Ctrl, Seq, 0x80, 0x00, TotalLen_H, TotalLen_L, StepLen, CmdID=0x0A, ...Payload]`
+* **Telemetry Notification Format**: JSON-encapsulated hex payload string:
+  `{"code":0,"payload":"EA8100000E0A23612810F0786464000000000000000000000000"}`
+  * Byte 6: Power state (`0x23` = ON, `0x24` = OFF)
+  * Byte 7: Mode flag (`0x61` = Color/CCT, `0x70` = Scene/White)
+  * Byte 8: Sub-mode / active scene identifier
+  * Byte 10: Active channel (`0xF0` = RGB, `0x0F` = White/CCT)
+  * Bytes 11–13: HSV color parameters (Hue / 2, Saturation %, RGB Brightness %)
+  * Bytes 14–15: CCT White parameters (Cool White %, White Brightness %)
 
-For comprehensive technical documentation, refer to [`docs/protocol_spec.md`](docs/protocol_spec.md).
+Detailed packet breakdown and BTSnoop capture analysis are documented in [`docs/protocol_spec.md`](docs/protocol_spec.md).
 
 ---
 

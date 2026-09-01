@@ -354,6 +354,14 @@ class ZenggePayloadBuilder:
         return bytes(cmd)
 
     @classmethod
+    def set_scene_magichome(cls, mode_id: int, speed: int = 16) -> bytes:
+        """Standard MagicHome hardware dynamic animation frame (0xBB <mode> <speed> 0x44 <checksum>)."""
+        spd = max(1, min(31, int(speed)))
+        cmd = bytearray([0xBB, mode_id & 0xFF, spd, 0x44])
+        cmd.append(cls._checksum(cmd))
+        return bytes(cmd)
+
+    @classmethod
     def set_scene(cls, scene_id: int, speed: int = 16) -> bytes:
         """Constructs a HagallBjarkan native firmware scene activation frame (0xE0 0x02 0x00 ...)."""
         speed_val = max(1, min(31, int(speed)))
@@ -621,3 +629,6 @@ class ZenggeLampDevice:
 
     async def set_scene(self, scene_id: int, speed: int = 16) -> Optional[ZenggeDeviceStatus]:
         return await self.send_command(ZenggePayloadBuilder.set_scene(scene_id, speed), wait_response=True)
+
+    async def set_scene_magichome(self, mode_id: int, speed: int = 16) -> Optional[ZenggeDeviceStatus]:
+        return await self.send_command(ZenggePayloadBuilder.set_scene_magichome(mode_id, speed), wait_response=True)

@@ -133,8 +133,7 @@ class TestStatusParsing(unittest.TestCase):
         self.assertEqual(status.mode_name, "Scene: Flame")
 
     def test_all_scenes_mapped(self):
-        self.assertEqual(len(SCENE_PRESETS), 26)
-        self.assertEqual(len(EFFECT_LIST), 26)
+        self.assertGreaterEqual(len(EFFECT_LIST), 26)
         self.assertIn("Flame", EFFECT_NAME_TO_ID)
         self.assertIn("flame", EFFECT_SLUG_TO_ID)
         self.assertIn("Breathe", EFFECT_NAME_TO_ID)

@@ -22,7 +22,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    AMBIENCE_PRESETS,
     DOMAIN,
+    DYNAMIC_SCENES,
     EFFECT_LIST,
     EFFECT_NAME_TO_ID,
     EFFECT_SLUG_TO_ID,
@@ -141,14 +143,44 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
 
         if ATTR_EFFECT in kwargs:
             effect_name = kwargs[ATTR_EFFECT]
-            scene_id = EFFECT_NAME_TO_ID.get(effect_name) or EFFECT_SLUG_TO_ID.get(effect_name.lower())
-            if scene_id is not None:
-                _LOGGER.debug("Activating scene %s (ID: 0x%02X)", effect_name, scene_id)
-                self._optimistic_effect = effect_name
-                new_status = await device.set_scene(scene_id)
+            self._optimistic_effect = effect_name
+            
+            if effect_name in DYNAMIC_SCENES:
+                cfg = DYNAMIC_SCENES[effect_name]
+                stype = cfg.get("type", "magichome")
+                mode_id = int(cfg["mode_id"])
+                speed = int(cfg.get("speed", 16))
+                _LOGGER.debug("Activating dynamic animation %s (type=%s, mode=0x%02X, speed=%d)", effect_name, stype, mode_id, speed)
+                if stype == "magichome":
+                    new_status = await device.set_scene_magichome(mode_id, speed)
+                else:
+                    new_status = await device.set_scene(mode_id, speed)
+
+            elif effect_name in AMBIENCE_PRESETS:
+                cfg = AMBIENCE_PRESETS[effect_name]
+                ptype = cfg.get("type", "cct")
+                _LOGGER.debug("Activating ambience preset %s (type=%s)", effect_name, ptype)
+                if ptype == "cct":
+                    cct_pct = int(cfg["cct_pct"])
+                    bri = int(cfg.get("bri", 100))
+                    self._optimistic_mode = ColorMode.COLOR_TEMP
+                    new_status = await device.set_cct(cct_pct, bri)
+                elif ptype == "hsv":
+                    hue = int(cfg["hue"])
+                    sat = int(cfg["sat"])
+                    bri = int(cfg.get("bri", 100))
+                    self._optimistic_mode = ColorMode.HS
+                    self._optimistic_hs = (float(hue), float(sat))
+                    new_status = await device.set_hsv(hue, sat, bri)
+
             else:
-                _LOGGER.warning("Unknown effect requested: %s", effect_name)
-                new_status = await device.power_on()
+                scene_id = EFFECT_NAME_TO_ID.get(effect_name) or EFFECT_SLUG_TO_ID.get(effect_name.lower())
+                if scene_id is not None:
+                    _LOGGER.debug("Activating legacy scene %s (ID: 0x%02X)", effect_name, scene_id)
+                    new_status = await device.set_scene_magichome(scene_id, 16)
+                else:
+                    _LOGGER.warning("Unknown effect requested: %s", effect_name)
+                    new_status = await device.power_on()
 
         elif ATTR_HS_COLOR in kwargs:
             hue, sat = kwargs[ATTR_HS_COLOR]

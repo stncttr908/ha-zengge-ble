@@ -60,8 +60,7 @@ class TestCoordinator(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_update_data_connected(self):
         status = ZenggeDeviceStatus.from_hex_payload("EA8100000E0A23610240F0006464000000000000000000000000")
-        self.device.query_status = AsyncMock(return_value=status)
-        self.device.connect = AsyncMock(return_value=True)
+        self.device._latest_status = status
 
         result = await self.coordinator._async_update_data()
         self.assertEqual(result, status)

@@ -65,6 +65,12 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.unique_id or coordinator.ble_device.address}_light"
+        self._optimistic_is_on: Optional[bool] = None
+        self._optimistic_brightness: Optional[int] = None
+        self._optimistic_hs: Optional[tuple[float, float]] = None
+        self._optimistic_cct: Optional[int] = None
+        self._optimistic_effect: Optional[str] = None
+        self._optimistic_mode: ColorMode = ColorMode.HS
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -84,14 +90,14 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
         """Return true if light is on."""
         if self.coordinator.data is not None:
             return self.coordinator.data.power
-        return None
+        return self._optimistic_is_on
 
     @property
     def brightness(self) -> Optional[int]:
         """Return the brightness of this light between 0..255."""
         if self.coordinator.data is not None:
             return int(round((self.coordinator.data.brightness / 100.0) * 255))
-        return None
+        return self._optimistic_brightness
 
     @property
     def color_mode(self) -> ColorMode:
@@ -100,14 +106,14 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
             if self.coordinator.data.channel_mode == "WHITE":
                 return ColorMode.COLOR_TEMP
             return ColorMode.HS
-        return ColorMode.HS
+        return self._optimistic_mode
 
     @property
     def hs_color(self) -> Optional[tuple[float, float]]:
         """Return the hue and saturation color value [float, float] (0..360, 0..100)."""
         if self.coordinator.data is not None and self.coordinator.data.channel_mode == "RGB":
             return (float(self.coordinator.data.hue), float(self.coordinator.data.saturation))
-        return None
+        return self._optimistic_hs
 
     @property
     def color_temp_kelvin(self) -> Optional[int]:
@@ -116,7 +122,7 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
             cct_pct = self.coordinator.data.cool_white
             kelvin = MIN_COLOR_TEMP_KELVIN + (cct_pct / 100.0) * (MAX_COLOR_TEMP_KELVIN - MIN_COLOR_TEMP_KELVIN)
             return int(round(kelvin))
-        return None
+        return self._optimistic_cct
 
     @property
     def effect(self) -> Optional[str]:
@@ -125,18 +131,20 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
             preset = SCENE_PRESETS.get(self.coordinator.data.mode_id)
             if preset:
                 return preset[0]
-        return None
+        return self._optimistic_effect
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on with optional attributes."""
         device = self.coordinator.device
         new_status = None
+        self._optimistic_is_on = True
 
         if ATTR_EFFECT in kwargs:
             effect_name = kwargs[ATTR_EFFECT]
             scene_id = EFFECT_NAME_TO_ID.get(effect_name) or EFFECT_SLUG_TO_ID.get(effect_name.lower())
             if scene_id is not None:
                 _LOGGER.debug("Activating scene %s (ID: 0x%02X)", effect_name, scene_id)
+                self._optimistic_effect = effect_name
                 new_status = await device.set_scene(scene_id)
             else:
                 _LOGGER.warning("Unknown effect requested: %s", effect_name)
@@ -149,11 +157,17 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
             else:
                 bri = self.coordinator.data.brightness if self.coordinator.data else 100
             _LOGGER.debug("Setting HS color: Hue=%.1f, Sat=%.1f, Bri=%d%%", hue, sat, bri)
+            self._optimistic_hs = (float(hue), float(sat))
+            self._optimistic_brightness = int(round((bri / 100.0) * 255))
+            self._optimistic_mode = ColorMode.HS
+            self._optimistic_effect = None
             new_status = await device.set_hsv(int(round(hue)) % 360, int(round(sat)), bri)
 
         elif ATTR_RGB_COLOR in kwargs:
             r, g, b = kwargs[ATTR_RGB_COLOR]
             _LOGGER.debug("Setting RGB color: (%d, %d, %d)", r, g, b)
+            self._optimistic_mode = ColorMode.HS
+            self._optimistic_effect = None
             new_status = await device.set_rgb(r, g, b)
 
         elif ATTR_COLOR_TEMP_KELVIN in kwargs:
@@ -165,11 +179,16 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
             else:
                 bri = self.coordinator.data.brightness if self.coordinator.data else 100
             _LOGGER.debug("Setting CCT: Kelvin=%d -> %d%%, Bri=%d%%", clamped_kelvin, cct_pct, bri)
+            self._optimistic_cct = clamped_kelvin
+            self._optimistic_brightness = int(round((bri / 100.0) * 255))
+            self._optimistic_mode = ColorMode.COLOR_TEMP
+            self._optimistic_effect = None
             new_status = await device.set_cct(cct_pct, bri)
 
         elif ATTR_BRIGHTNESS in kwargs:
             bri_pct = max(1, int(round((kwargs[ATTR_BRIGHTNESS] / 255.0) * 100)))
             _LOGGER.debug("Setting brightness: %d%%", bri_pct)
+            self._optimistic_brightness = kwargs[ATTR_BRIGHTNESS]
             new_status = await device.set_brightness(bri_pct)
 
         else:
@@ -184,6 +203,7 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
         _LOGGER.debug("Turning lamp OFF")
+        self._optimistic_is_on = False
         new_status = await self.coordinator.device.power_off()
         if new_status is not None:
             self.coordinator.async_set_updated_data(new_status)

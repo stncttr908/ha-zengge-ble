@@ -47,13 +47,18 @@ class ZenggeBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> FlowResult:
         """Handle bluetooth discovery initiated by Home Assistant."""
-        _LOGGER.debug("Discovered Zengge BLE device via Bluetooth: %s (%s)", discovery_info.name, discovery_info.address)
+        name = discovery_info.name or ""
+        if name.upper().startswith("PROV_"):
+            _LOGGER.debug("Ignoring non-Zengge provisioning beacon: %s (%s)", name, discovery_info.address)
+            return self.async_abort(reason="not_zengge_device")
+
+        _LOGGER.debug("Discovered Zengge BLE device via Bluetooth: %s (%s)", name, discovery_info.address)
         formatted_address = format_mac(discovery_info.address)
         await self.async_set_unique_id(formatted_address)
         self._abort_if_unique_id_configured()
 
         self._discovery_info = discovery_info
-        title = discovery_info.name or f"Zengge Lamp {formatted_address}"
+        title = name or f"Zengge Lamp {formatted_address}"
         self.context["title_placeholders"] = {"name": title}
         return await self.async_step_bluetooth_confirm()
 
@@ -116,6 +121,9 @@ class ZenggeBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 continue
 
             name = discovery_info.name or ""
+            if name.upper().startswith("PROV_"):
+                continue
+
             service_uuids = [str(u).lower() for u in discovery_info.service_uuids]
 
             # Match standard Zengge service UUID 0xFFFF or name prefixes

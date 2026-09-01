@@ -7,9 +7,10 @@ import colorsys
 import json
 import logging
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
-from bleak import BleakClient, BleakScanner
+from bleak import BleakClient
+from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
 
@@ -331,11 +332,18 @@ class ZenggePayloadBuilder:
         return bytes([0xE0, 0x01, 0x00, 0xA1, h_div2, sat, bri, 0x00, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00])
 
     @classmethod
-    def set_cct(cls, cct_percent: int, brightness: int) -> bytes:
-        """Extended HagallBjarkan 0xB1 CCT command."""
-        cct = max(0, min(100, int(cct_percent)))
-        bri = max(0, min(100, int(brightness)))
-        return bytes([0xE0, 0x01, 0x00, 0xB1, 0x00, 0x00, 0x00, cct, bri, 0x00, 0x00, 0x14, 0x00, 0x00])
+    def set_cct(cls, cct_percent: int, brightness: int = 100) -> bytes:
+        """Sets color temperature using standard MagicHome WW/CW PWM channels."""
+        cct_pct = max(0, min(100, int(cct_percent)))
+        bri_pct = max(1, min(100, int(brightness)))
+        
+        # Balance Warm White (0% CCT) vs Cool White (100% CCT)
+        cct_ratio = cct_pct / 100.0
+        bri_factor = (bri_pct / 100.0) * 255.0
+        warm = int(round((1.0 - cct_ratio) * bri_factor))
+        cold = int(round(cct_ratio * bri_factor))
+        
+        return cls.set_white(warm, cold)
 
     @classmethod
     def set_white(cls, warm: int, cold: int) -> bytes:
@@ -348,7 +356,8 @@ class ZenggePayloadBuilder:
     @classmethod
     def set_scene(cls, scene_id: int, speed: int = 16) -> bytes:
         """Constructs a HagallBjarkan native firmware scene activation frame (0xE0 0x02 0x00 ...)."""
-        return bytes([0xE0, 0x02, 0x00, scene_id & 0xFF, 0xFF, 0xFF])
+        speed_val = max(1, min(31, int(speed)))
+        return bytes([0xE0, 0x02, 0x00, scene_id & 0xFF, speed_val, 0xFF])
 
 
 class ZenggeLampDevice:
@@ -358,6 +367,8 @@ class ZenggeLampDevice:
         self._ble_device = ble_device
         self._address = (ble_device.address if ble_device else address) or ""
         self.client: Optional[BleakClient] = None
+        self._write_char: Optional[BleakGATTCharacteristic] = None
+        self._notify_char: Optional[BleakGATTCharacteristic] = None
         self._seq = 1
         self._decoder = LowerTransportLayerDecoder()
         self._status_future: Optional[asyncio.Future[ZenggeDeviceStatus]] = None
@@ -406,6 +417,40 @@ class ZenggeLampDevice:
         if cb in self._callbacks:
             self._callbacks.remove(cb)
 
+    def _resolve_gatt_characteristics(self) -> bool:
+        """Dynamically resolve write and notify characteristics across 16-bit and 128-bit UUID formats."""
+        if not self.client or not self.client.services:
+            return False
+
+        self._write_char = None
+        self._notify_char = None
+
+        for service in self.client.services:
+            for char in service.characteristics:
+                uuid_str = str(char.uuid).lower()
+                
+                # Check for write characteristic (FF01 or write properties on FFFF service)
+                if "ff01" in uuid_str:
+                    self._write_char = char
+                elif not self._write_char and any(p in char.properties for p in ("write-without-response", "write")):
+                    if "ffff" in str(service.uuid).lower():
+                        self._write_char = char
+
+                # Check for notify characteristic (FF02 or notify properties on FFFF service)
+                if "ff02" in uuid_str:
+                    self._notify_char = char
+                elif not self._notify_char and "notify" in char.properties:
+                    if "ffff" in str(service.uuid).lower():
+                        self._notify_char = char
+
+        _LOGGER.debug(
+            "Resolved GATT on %s: write_char=%s, notify_char=%s",
+            self._address,
+            self._write_char.uuid if self._write_char else "None",
+            self._notify_char.uuid if self._notify_char else "None",
+        )
+        return self._write_char is not None
+
     async def connect(self, timeout: float = DEFAULT_CONNECTION_TIMEOUT) -> bool:
         """Connects to the lamp and enables telemetry notifications."""
         async with self._lock:
@@ -426,12 +471,22 @@ class ZenggeLampDevice:
                     _LOGGER.warning("Failed to establish BLE connection to %s", self._address)
                     return False
 
-                # Subscribe to notifications if characteristic 0xFF02 exists
-                try:
-                    await self.client.start_notify(NOTIFY_UUID, self._on_notification)
-                    _LOGGER.debug("Subscribed to telemetry notifications (0xFF02) on %s", self._address)
-                except Exception as notif_err:
-                    _LOGGER.debug("Notification subscription on %s: %s", self._address, notif_err)
+                # Resolve write and notify characteristics dynamically
+                self._resolve_gatt_characteristics()
+
+                # Subscribe to notifications if notify characteristic exists
+                if self._notify_char:
+                    try:
+                        await self.client.start_notify(self._notify_char, self._on_notification)
+                        _LOGGER.debug("Subscribed to telemetry notifications (%s) on %s", self._notify_char.uuid, self._address)
+                    except Exception as notif_err:
+                        _LOGGER.debug("Notification subscription on %s: %s", self._address, notif_err)
+                else:
+                    # Fallback subscription attempt on NOTIFY_UUID
+                    try:
+                        await self.client.start_notify(NOTIFY_UUID, self._on_notification)
+                    except Exception:
+                        pass
 
                 return True
             except Exception as err:
@@ -448,17 +503,20 @@ class ZenggeLampDevice:
         """Disconnects cleanly from the lamp."""
         async with self._lock:
             if self.client and self.client.is_connected:
-                try:
-                    await self.client.stop_notify(NOTIFY_UUID)
-                except Exception:
-                    pass
+                if self._notify_char:
+                    try:
+                        await self.client.stop_notify(self._notify_char)
+                    except Exception:
+                        pass
                 try:
                     await self.client.disconnect()
                 except Exception:
                     pass
             self.client = None
+            self._write_char = None
+            self._notify_char = None
 
-    def _on_notification(self, sender: int, data: bytearray) -> None:
+    def _on_notification(self, sender: Any, data: bytearray) -> None:
         """Handle incoming GATT notifications on 0xFF02."""
         raw = bytes(data)
         upper = self._decoder.decode(raw)
@@ -486,12 +544,17 @@ class ZenggeLampDevice:
         wait_response: bool = False,
         timeout: float = DEFAULT_COMMAND_TIMEOUT,
     ) -> Optional[ZenggeDeviceStatus]:
-        """Wrap inner payload into transport frames and transmit over characteristic 0xFF01."""
+        """Wrap inner payload into transport frames and transmit over write characteristic."""
         if not self.is_connected or self.client is None:
-            # Attempt auto-reconnect if disconnected
             connected = await self.connect()
             if not connected or self.client is None:
                 raise BleakError(f"Device {self._address} not connected")
+
+        # Ensure write characteristic is resolved
+        if not self._write_char:
+            self._resolve_gatt_characteristics()
+
+        char_specifier = self._write_char or WRITE_UUID
 
         upper = UpperTransportLayer(
             ack=False,
@@ -508,7 +571,7 @@ class ZenggeLampDevice:
             self._status_future = loop.create_future()
 
         for frame in frames:
-            await self.client.write_gatt_char(WRITE_UUID, frame, response=False)
+            await self.client.write_gatt_char(char_specifier, frame, response=False)
             if len(frames) > 1:
                 await asyncio.sleep(INTER_FRAME_DELAY)
 

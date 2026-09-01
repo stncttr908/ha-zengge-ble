@@ -56,15 +56,15 @@ class TestProtocolSerialization(unittest.TestCase):
 
     def test_encode_cct(self):
         inner = ZenggePayloadBuilder.set_cct(cct_percent=50, brightness=80)
-        self.assertEqual(inner, bytes.fromhex("E00100B100000032500000140000"))
+        self.assertEqual(inner, bytes.fromhex("3100000066660F0C"))
 
     def test_encode_rgb_legacy(self):
         inner = ZenggePayloadBuilder.set_rgb_legacy(255, 0, 0)
         self.assertEqual(inner, bytes.fromhex("31FF000000000F3F"))
 
     def test_encode_scene(self):
-        inner = ZenggePayloadBuilder.set_scene(0x2C)  # Flame
-        self.assertEqual(inner, bytes.fromhex("E002002CFFFF"))
+        inner = ZenggePayloadBuilder.set_scene(0x2C, speed=16)  # Flame
+        self.assertEqual(inner, bytes.fromhex("E002002C10FF"))
 
     def test_decode_json_notification(self):
         raw_ntf = bytes.fromhex(

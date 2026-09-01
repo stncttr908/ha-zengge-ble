@@ -2,28 +2,22 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from datetime import timedelta
 from typing import Optional
 
 from bleak.backends.device import BLEDevice
-from bleak.exc import BleakError
 
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN
 from .zengge_protocol import ZenggeDeviceStatus, ZenggeLampDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-# Polling interval for background health check / fallback status sync
-POLL_INTERVAL = timedelta(seconds=60)
-
 
 class ZenggeDataUpdateCoordinator(DataUpdateCoordinator[Optional[ZenggeDeviceStatus]]):
-    """Coordinator to manage connection state, push notifications, and status polling."""
+    """Coordinator to manage connection state and push notifications."""
 
     def __init__(
         self,
@@ -31,12 +25,12 @@ class ZenggeDataUpdateCoordinator(DataUpdateCoordinator[Optional[ZenggeDeviceSta
         ble_device: BLEDevice,
         device: ZenggeLampDevice,
     ) -> None:
-        """Initialize coordinator."""
+        """Initialize coordinator without periodic polling (pure push updates)."""
         super().__init__(
             hass,
             _LOGGER,
             name=f"{DOMAIN}_{ble_device.address}",
-            update_interval=POLL_INTERVAL,
+            update_interval=None,  # Pure push architecture: state pushes via 0xFF02 notifications
         )
         self.ble_device = ble_device
         self.device = device
@@ -67,18 +61,5 @@ class ZenggeDataUpdateCoordinator(DataUpdateCoordinator[Optional[ZenggeDeviceSta
         self.device.set_ble_device(ble_device)
 
     async def _async_update_data(self) -> Optional[ZenggeDeviceStatus]:
-        """Fetch latest status via query_status if connected, or maintain cached state."""
-        try:
-            if not self.device.is_connected:
-                _LOGGER.debug("Coordinator connecting to %s for status query", self.ble_device.address)
-                connected = await self.device.connect()
-                if not connected:
-                    # If device is currently unconnectable (e.g. lamp powered off at wall), return last known or None
-                    return self.device.status
-
-            status = await self.device.query_status()
-            return status or self.device.status
-        except (BleakError, asyncio.TimeoutError, ConnectionError) as err:
-            _LOGGER.debug("Coordinator error querying %s: %s", self.ble_device.address, err)
-            # Return last known state rather than hard-failing to preserve entity availability
-            return self.device.status
+        """Return current status without executing invasive query commands."""
+        return self.device.status

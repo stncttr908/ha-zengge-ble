@@ -132,29 +132,30 @@ class LowerTransportLayerEncoder:
         return ctrl & 0xFF
 
     @classmethod
-    def generate(cls, upper: UpperTransportLayer, max_length: int = 255) -> list[bytes]:
+    def generate(cls, upper: UpperTransportLayer, max_length: int = 244) -> list[bytes]:
         """
         Encapsulates upper payload into one or more Lower Transport Layer frame chunks.
         """
         payload = upper.payload
-        max_inner = max_length - 8
+        total_len = len(payload)
 
-        if len(payload) <= max_inner:
-            # Single unsegmented packet
-            frame = bytearray(len(payload) + 8)
-            frame[0] = cls._create_ctrl(upper.protect, upper.ack, False, 0)
+        # Standard unfragmented frame (matches real HagallBjarkan app packet captures up to MTU)
+        if total_len <= (max_length - 8):
+            frame = bytearray(8 + total_len)
+            frame[0] = cls._create_ctrl(upper.protect, upper.ack, False, upper.type)
             frame[1] = upper.seq & 0xFF
-            frame[2] = (MARKER_MIN_VALUE >> 8) & 0xFF  # 0x80
-            frame[3] = MARKER_MIN_VALUE & 0xFF         # 0x00
-            frame[4] = (len(payload) >> 8) & 0xFF
-            frame[5] = len(payload) & 0xFF
-            frame[6] = (len(payload) + 1) & 0xFF
+            frame[2] = 0x80
+            frame[3] = 0x00
+            frame[4] = (total_len >> 8) & 0xFF
+            frame[5] = total_len & 0xFF
+            frame[6] = (total_len + 1) & 0xFF
             frame[7] = upper.cmd_id & 0xFF
             frame[8:] = payload
             return [bytes(frame)]
 
-        # Multi-segment fragmentation
-        rem_len = (len(payload) - max_length) + 8
+        # Multi-segment fragmentation for oversized payloads
+        max_inner = max_length - 8
+        rem_len = len(payload) - max_inner
         step = max_length - 5
         seg_count = 2 if rem_len <= step else ((rem_len // step) + 1 if rem_len % step == 0 else (rem_len // step) + 2)
 

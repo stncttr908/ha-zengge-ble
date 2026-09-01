@@ -137,9 +137,10 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
         """Helper to resolve active brightness percent (1..100)."""
         if ATTR_BRIGHTNESS in kwargs:
             return max(1, min(100, int(round((kwargs[ATTR_BRIGHTNESS] / 255.0) * 100))))
-        if self.coordinator.data and self.coordinator.data.brightness > 0:
-            return max(1, min(100, self.coordinator.data.brightness))
-        if self._optimistic_brightness and self._optimistic_brightness > 0:
+        if self.coordinator.data and isinstance(getattr(self.coordinator.data, "brightness", None), int):
+            if self.coordinator.data.brightness > 0:
+                return max(1, min(100, self.coordinator.data.brightness))
+        if isinstance(self._optimistic_brightness, int) and self._optimistic_brightness > 0:
             return max(1, min(100, int(round((self._optimistic_brightness / 255.0) * 100))))
         return 100
 
@@ -155,7 +156,23 @@ class ZenggeHBLightEntity(CoordinatorEntity[ZenggeDataUpdateCoordinator], LightE
             if scene_id is not None:
                 _LOGGER.debug("Activating scene %s (ID: 0x%02X)", effect_name, scene_id)
                 self._optimistic_effect = effect_name
-                new_status = await device.set_scene(scene_id)
+                
+                cur_hue = None
+                cur_sat = None
+                cur_bri = self._get_active_brightness_percent(kwargs)
+                if self.coordinator.data and self.coordinator.data.channel_mode == "RGB":
+                    cur_hue = self.coordinator.data.hue
+                    cur_sat = self.coordinator.data.saturation
+                elif self._optimistic_hs:
+                    cur_hue = int(self._optimistic_hs[0])
+                    cur_sat = int(self._optimistic_hs[1])
+
+                new_status = await device.set_scene(
+                    scene_id,
+                    current_hue=cur_hue,
+                    current_sat=cur_sat,
+                    current_bri=cur_bri,
+                )
             else:
                 _LOGGER.warning("Unknown effect requested: %s", effect_name)
                 new_status = await device.power_on()

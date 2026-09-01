@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "minor_version": 2,
+  "key": "repairs.issue_registry",
+  "data": {
+    "issues": [
+      {
+        "created": "2026-09-01T13:54:24.835648+00:00",
+        "dismissed_version": null,
+        "domain": "http",
+        "is_persistent": false,
+        "issue_id": "deprecated_yaml"
+      },
+      {
+        "created": "2026-09-01T13:57:40.819400+00:00",
+        "dismissed_version": "2026.8.3",
+        "domain": "http",
+        "is_persistent": false,
+        "issue_id": "yaml_still_present_after_migration"
+      }
+    ]
+  }
+}

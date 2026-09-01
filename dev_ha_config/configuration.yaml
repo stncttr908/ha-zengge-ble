@@ -1,0 +1,25 @@
+# Minimal Home Assistant Test / Development Configuration
+# Zero mDNS / SSDP Multicast Flooding
+
+frontend:
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - ::1
+    - 172.16.0.0/12
+config:
+history:
+logbook:
+system_health:
+bluetooth:
+
+# Explicitly restrict zeroconf to prevent any outbound interface broadcast
+zeroconf:
+  default_interface: false
+  ipv6: false
+
+logger:
+  default: info
+  logs:
+    custom_components.zengge_ble: debug

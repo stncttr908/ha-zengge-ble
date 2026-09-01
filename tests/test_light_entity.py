@@ -101,10 +101,10 @@ class TestZenggeLightEntity(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_turn_on_effect(self):
         await self.entity.async_turn_on(**{ATTR_EFFECT: "Flame"})
-        self.device.set_scene.assert_awaited_once_with(0x2C)
+        self.device.set_scene.assert_awaited_once_with(0x2C, current_hue=None, current_sat=None, current_bri=100)
 
         await self.entity.async_turn_on(**{ATTR_EFFECT: "Breathe"})
-        self.device.set_scene.assert_awaited_with(0x01)
+        self.device.set_scene.assert_awaited_with(0x01, current_hue=None, current_sat=None, current_bri=100)
 
     async def test_async_turn_on_hs_color(self):
         await self.entity.async_turn_on(**{ATTR_HS_COLOR: (120.0, 100.0), ATTR_BRIGHTNESS: 255})

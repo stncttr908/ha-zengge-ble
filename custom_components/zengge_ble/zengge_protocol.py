@@ -56,27 +56,27 @@ class LowerTransportLayerEncoder:
         return ctrl & 0xFF
 
     @classmethod
-    def generate(cls, upper: UpperTransportLayer, max_length: int = 255) -> list[bytes]:
-        """Encapsulate upper payload into one or more Lower Transport Layer frame chunks."""
+    def generate(cls, upper: UpperTransportLayer, max_length: int = 244) -> list[bytes]:
         payload = upper.payload
-        max_inner = max_length - 8
+        total_len = len(payload)
 
-        if len(payload) <= max_inner:
-            # Single unsegmented packet
-            frame = bytearray(len(payload) + 8)
-            frame[0] = cls._create_ctrl(upper.protect, upper.ack, False, 0)
+        # Standard unfragmented frame (matches real HagallBjarkan app packet captures up to MTU)
+        if total_len <= (max_length - 8):
+            frame = bytearray(8 + total_len)
+            frame[0] = cls._create_ctrl(upper.protect, upper.ack, False, upper.type)
             frame[1] = upper.seq & 0xFF
-            frame[2] = (MARKER_MIN_VALUE >> 8) & 0xFF  # 0x80
-            frame[3] = MARKER_MIN_VALUE & 0xFF         # 0x00
-            frame[4] = (len(payload) >> 8) & 0xFF
-            frame[5] = len(payload) & 0xFF
-            frame[6] = (len(payload) + 1) & 0xFF
+            frame[2] = 0x80
+            frame[3] = 0x00
+            frame[4] = (total_len >> 8) & 0xFF
+            frame[5] = total_len & 0xFF
+            frame[6] = (total_len + 1) & 0xFF
             frame[7] = upper.cmd_id & 0xFF
             frame[8:] = payload
             return [bytes(frame)]
 
-        # Multi-segment fragmentation
-        rem_len = (len(payload) - max_length) + 8
+        # Multi-segment fragmentation for oversized payloads
+        max_inner = max_length - 8
+        rem_len = len(payload) - max_inner
         step = max_length - 5
         seg_count = 2 if rem_len <= step else ((rem_len // step) + 1 if rem_len % step == 0 else (rem_len // step) + 2)
 
@@ -256,9 +256,16 @@ class ZenggeDeviceStatus:
             hue_div2 = b[11]
             hue = min(360, hue_div2 * 2)
             saturation = b[12]
-            brightness = b[13]
-            warm_white = b[14] if len(b) > 14 else 0
-            cool_white = b[15] if len(b) > 15 else 0
+
+            if is_rgb:
+                brightness = b[13]
+                warm_white = b[14] if len(b) > 14 else 0
+                cool_white = b[15] if len(b) > 15 else 0
+            else:
+                # In White/CCT mode, b[14] is warm white, b[15] is cool white / white brightness
+                warm_white = b[14] if len(b) > 14 else 0
+                cool_white = b[15] if len(b) > 15 else 0
+                brightness = b[15] if (len(b) > 15 and b[15] > 0) else (b[14] if (len(b) > 14 and b[14] > 0) else 100)
 
             # Compute approximate RGB
             if is_rgb:
@@ -355,6 +362,19 @@ class ZenggePayloadBuilder:
     def set_scene(cls, scene_id: int, speed: int = 16) -> bytes:
         """HagallBjarkan native firmware scene activation frame matching live app captures."""
         return bytes([0xE0, 0x02, 0x00, scene_id & 0xFF, 0xFF, 0xFF])
+
+    @classmethod
+    def build_breathing_pattern(cls, hue: int, sat: int = 100, bri: int = 100, speed: int = 100) -> bytes:
+        """Constructs a dynamic 2-step breathing pattern in the given color."""
+        h_div2 = max(0, min(180, int(hue // 2)))
+        sat_val = max(0, min(100, int(sat)))
+        bri_high = max(10, min(100, int(bri)))
+        bri_low = max(5, int(round(bri_high * 0.15)))
+        return bytes([
+            0xE0, 0x04, 0x00, speed & 0xFF, 0x02,
+            0x01, 0x03, 0xA1, h_div2, sat_val, bri_high, 0x01, 0x00, 0x20, 0x00, 0x40, 0x00, 0x00,
+            0x02, 0x03, 0xA1, h_div2, sat_val, bri_low, 0x01, 0x00, 0x20, 0x00, 0x40, 0x00, 0x00,
+        ])
 
 
 # Multi-step color patterns for HagallBjarkan dynamic hardware animations
@@ -667,16 +687,38 @@ class ZenggeLampDevice:
         else:
             return await self.set_cct(0, brightness_percent)
 
-    async def set_scene(self, scene_id: int, speed: int = 16) -> Optional[ZenggeDeviceStatus]:
+    async def set_scene(
+        self,
+        scene_id: int,
+        speed: int = 16,
+        current_hue: Optional[int] = None,
+        current_sat: Optional[int] = None,
+        current_bri: Optional[int] = None,
+    ) -> Optional[ZenggeDeviceStatus]:
         """Activate scene with multi-step color sequence upload if defined."""
-        pattern = SCENE_PATTERNS.get(scene_id)
+        pattern = None
+        exec_mode = scene_id
+
+        if scene_id in [0x01, 0x27] and current_hue is not None:
+            # Custom breathing in the currently active light color
+            pattern = ZenggePayloadBuilder.build_breathing_pattern(
+                current_hue,
+                current_sat if current_sat is not None else 100,
+                current_bri if current_bri is not None else 100,
+            )
+            exec_mode = 0x25  # Execute custom uploaded pattern via 0x25
+        elif scene_id in SCENE_PATTERNS:
+            pattern = SCENE_PATTERNS[scene_id]
+            exec_mode = 0x25  # Execute custom uploaded pattern via 0x25
+
         if pattern:
             try:
                 await self.send_command(pattern, wait_response=False)
                 await asyncio.sleep(0.04)
             except Exception as pat_err:
                 _LOGGER.debug("Pattern upload on %s: %s", self._address, pat_err)
-        return await self.send_command(ZenggePayloadBuilder.set_scene(scene_id, speed), wait_response=True)
+
+        return await self.send_command(ZenggePayloadBuilder.set_scene(exec_mode, speed), wait_response=True)
 
     async def set_scene_magichome(self, mode_id: int, speed: int = 16) -> Optional[ZenggeDeviceStatus]:
         return await self.send_command(ZenggePayloadBuilder.set_scene_magichome(mode_id, speed), wait_response=True)

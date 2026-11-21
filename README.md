@@ -41,7 +41,7 @@ A high-performance, fully reverse-engineered Home Assistant custom integration f
   * *Model Identifier*: `IOTBT537` / `0x000E` (`14`) / `E4:98:BB:69:E5:37`
   * *Hardware*: Capacitive touch-dimming base, dual Warm/Cool White LED array + 5050 RGB diode array, BLE 5.0 microcontroller (`ledVersion=10`).
   * *Verification*: 100% verified on physical hardware across power control, HSV color wheel, CCT tunable white scaling, 26 native dynamic scenes, and bidirectional local push telemetry.
-* **Zengge / Surplife Carrier-Wave Addressable RGB Christmas String Lights**
+* **[Zengge / Surplife Carrier-Wave Addressable RGB Christmas String Lights (Amazon ASIN: B0FFSPTG67)](https://www.amazon.com/dp/B0FFSPTG67)**
   * *Model Identifier*: `IOTBTD84` / `0x00C5` (`197`) / `08:65:F0:41:DD:84` (`BT.5B.00C5.43.28,V8`, PHY6252 `0x5A5B`)
   * *Hardware*: 25 addressable RGB LEDs (`0x19`), Gen-3 Carrier-Wave Symphony (`wifibleCarrierWaveSymphony` / `hc3`) BLE 5.0 controller (`ledVersion=8`).
   * *Verification*: 100% verified on physical hardware across power control (`E0 01 00 23/24`), 9-bit HSV color control (`E0 01 00 C1`), 5 multi-color string presets (`EC 07`), 68 built-in dynamic effects (`E1 21`), 6 device-mic music modes (`EC 03`), and bidirectional `0xFF02` telemetry (`EA810000C508...`).

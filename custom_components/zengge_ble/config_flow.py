@@ -16,7 +16,14 @@ from homeassistant.components.bluetooth import (
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, SERVICE_UUID
+from .const import (
+    CONF_LED_VERSION,
+    CONF_PRODUCT_ID,
+    DOMAIN,
+    SERVICE_UUID,
+    ZENGGE_SERVICE_DATA_UUIDS,
+)
+from .zengge_protocol import parse_service_data_product_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,12 +78,20 @@ class ZenggeBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             formatted_address = format_mac(self._discovery_info.address)
             title = self._discovery_info.name or f"Zengge Lamp {formatted_address}"
+            entry_data: dict[str, Any] = {
+                CONF_ADDRESS: formatted_address,
+                CONF_NAME: title,
+            }
+            product_id, _fw, led_version = parse_service_data_product_info(
+                getattr(self._discovery_info, "service_data", None)
+            )
+            if product_id is not None:
+                entry_data[CONF_PRODUCT_ID] = product_id
+            if led_version is not None:
+                entry_data[CONF_LED_VERSION] = led_version
             return self.async_create_entry(
                 title=title,
-                data={
-                    CONF_ADDRESS: formatted_address,
-                    CONF_NAME: title,
-                },
+                data=entry_data,
             )
 
         name = self._discovery_info.name or self._discovery_info.address
@@ -103,12 +118,21 @@ class ZenggeBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                 info = self._discovered_devices.get(formatted_address) or self._discovered_devices.get(address)
                 title = (info.name if info else None) or f"Zengge Lamp {formatted_address}"
+                entry_data: dict[str, Any] = {
+                    CONF_ADDRESS: formatted_address,
+                    CONF_NAME: title,
+                }
+                if info is not None:
+                    product_id, _fw, led_version = parse_service_data_product_info(
+                        getattr(info, "service_data", None)
+                    )
+                    if product_id is not None:
+                        entry_data[CONF_PRODUCT_ID] = product_id
+                    if led_version is not None:
+                        entry_data[CONF_LED_VERSION] = led_version
                 return self.async_create_entry(
                     title=title,
-                    data={
-                        CONF_ADDRESS: formatted_address,
-                        CONF_NAME: title,
-                    },
+                    data=entry_data,
                 )
 
         current_addresses = self._async_current_ids()
@@ -125,10 +149,14 @@ class ZenggeBLEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 continue
 
             service_uuids = [str(u).lower() for u in discovery_info.service_uuids]
+            service_data = getattr(discovery_info, "service_data", None) or {}
+            service_data_uuids = [str(u).lower() for u in service_data.keys()]
 
-            # Match standard Zengge service UUID 0xFFFF or name prefixes
+            # Match standard Zengge service UUID 0xFFFF, 0x5A00/0x5A02 service data, or name prefixes
             is_match = False
             if SERVICE_UUID.lower() in service_uuids or "ffff" in "".join(service_uuids):
+                is_match = True
+            elif any(u in ZENGGE_SERVICE_DATA_UUIDS or "00005a0" in u for u in service_data_uuids):
                 is_match = True
             elif name.upper().startswith("IOTBT") or "ZENGGE" in name.upper() or "MAGIC" in name.upper():
                 is_match = True

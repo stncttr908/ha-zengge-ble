@@ -6,7 +6,7 @@ import asyncio
 import colorsys
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Optional
 
 from bleak import BleakClient
@@ -21,6 +21,10 @@ except ImportError:
     HAVE_BLEAK_RETRY_CONNECTOR = False
 
 from .const import (
+    CARRIER_WAVE_EFFECT_BY_KEY,
+    CARRIER_WAVE_EFFECT_TEMPLATES,
+    CARRIER_WAVE_MODE_TO_DEFAULT_NAME,
+    CARRIER_WAVE_PRODUCT_IDS,
     CMD_ID_APP,
     DEFAULT_COMMAND_TIMEOUT,
     DEFAULT_CONNECTION_TIMEOUT,
@@ -29,9 +33,33 @@ from .const import (
     NOTIFY_UUID,
     SCENE_PRESETS,
     WRITE_UUID,
+    ZENGGE_SERVICE_DATA_UUIDS,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def parse_service_data_product_info(
+    service_data: Optional[dict[Any, bytes]],
+) -> tuple[Optional[int], Optional[int], Optional[int]]:
+    """Extract (product_id, firmware_ver, led_version) from Zengge 0x5Axx BLE service data."""
+    if not service_data:
+        return (None, None, None)
+
+    for uuid_key, raw_val in service_data.items():
+        uuid_str = str(uuid_key).lower()
+        if not (
+            uuid_str in ZENGGE_SERVICE_DATA_UUIDS
+            or any(prefix in uuid_str for prefix in ("00005a00", "00005a01", "00005a02", "00005b", "00005c"))
+        ):
+            continue
+        if isinstance(raw_val, (bytes, bytearray)) and len(raw_val) >= 12:
+            product_id = (raw_val[8] << 8) | raw_val[9]
+            firmware_ver = raw_val[10]
+            led_version = raw_val[11]
+            return (product_id, firmware_ver, led_version)
+
+    return (None, None, None)
 
 
 @dataclass
@@ -213,7 +241,7 @@ class LowerTransportLayerDecoder:
 
 @dataclass
 class ZenggeDeviceStatus:
-    """Parsed lamp telemetry state from 26-byte status payload."""
+    """Parsed lamp telemetry state from 26/27-byte status payload."""
 
     raw_hex: str
     power: bool
@@ -226,23 +254,85 @@ class ZenggeDeviceStatus:
     warm_white: int    # 0..100%
     cool_white: int    # 0..100%
     rgb_approx: tuple[int, int, int]
+    product_id: int = 0
+    led_version: int = 0
+    sub_mode_id: int = 0
+    speed: int = 0
+    point_count: int = 0
 
     @property
     def is_scene_mode(self) -> bool:
-        """Returns True if the current operating mode is a preset scene."""
+        """Returns True if the current operating mode is a preset scene or dynamic effect."""
+        if self.product_id in CARRIER_WAVE_PRODUCT_IDS:
+            return (
+                self.mode_id in (0x25, 0x62, 0x66)
+                or (self.mode_id == 0x24 and self.sub_mode_id == 0x01)
+            )
         return self.mode_id in SCENE_PRESETS
 
     @classmethod
     def from_hex_payload(cls, hex_str: str) -> Optional[ZenggeDeviceStatus]:
-        """Parses 26-byte status payload (e.g. 'EA8100000E0A23610240F0006464000000000000000000000000')."""
+        """Parses 26/27-byte status payload (e.g. 'EA8100000E0A...' or 'EA810000C508...')."""
         try:
             b = bytes.fromhex(hex_str.strip().replace(" ", ""))
             if len(b) < 14:
                 return None
 
+            product_id = ((b[3] << 8) | b[4]) if (b[0] == 0xEA and b[1] == 0x81) else 0
+            led_version = b[5] if (b[0] == 0xEA and b[1] == 0x81) else 0
             power = (b[6] == 0x23)
             mode_id = b[7]
             sub_mode_id = b[8] if len(b) > 8 else 0
+            speed = b[9] if len(b) > 9 else 0
+
+            if product_id in CARRIER_WAVE_PRODUCT_IDS:
+                hue_div2 = b[11]
+                sat_packed = b[12]
+                hue_lsb = (sat_packed >> 7) & 0x01
+                hue = min(359, (hue_div2 << 1) | hue_lsb)
+                saturation = min(100, sat_packed & 0x7F)
+                brightness = max(0, min(100, b[13]))
+                point_count = b[18] if len(b) > 18 else 0
+
+                if mode_id == 0x25:
+                    eff = CARRIER_WAVE_MODE_TO_DEFAULT_NAME.get((0x25, sub_mode_id))
+                    mode_name = f"Effect: {eff}" if eff else f"Effect: 0x{sub_mode_id:02X}"
+                elif mode_id == 0x62:
+                    mode_name = CARRIER_WAVE_MODE_TO_DEFAULT_NAME.get(
+                        (0x62, sub_mode_id), f"Music: 0x{sub_mode_id:02X}"
+                    )
+                elif mode_id == 0x66:
+                    mode_name = "Custom Smudge"
+                elif mode_id == 0x24 and sub_mode_id == 0x01:
+                    mode_name = "String Preset"
+                elif mode_id == 0x24:
+                    mode_name = "Static Color"
+                else:
+                    mode_name = f"Mode 0x{mode_id:02X}"
+
+                r_f, g_f, b_f = colorsys.hsv_to_rgb(
+                    hue / 360.0, saturation / 100.0, max(0.01, brightness / 100.0)
+                )
+                rgb_approx = (int(r_f * 255), int(g_f * 255), int(b_f * 255))
+
+                return cls(
+                    raw_hex=hex_str,
+                    power=power,
+                    mode_id=mode_id,
+                    mode_name=mode_name,
+                    channel_mode="RGB",
+                    hue=hue,
+                    saturation=saturation,
+                    brightness=brightness,
+                    warm_white=0,
+                    cool_white=0,
+                    rgb_approx=rgb_approx,
+                    product_id=product_id,
+                    led_version=led_version,
+                    sub_mode_id=sub_mode_id,
+                    speed=speed,
+                    point_count=point_count,
+                )
 
             mode_name = "Unknown"
             if mode_id in SCENE_PRESETS:
@@ -292,6 +382,10 @@ class ZenggeDeviceStatus:
                 warm_white=warm_white,
                 cool_white=cool_white,
                 rgb_approx=rgb_approx,
+                product_id=product_id,
+                led_version=led_version,
+                sub_mode_id=sub_mode_id,
+                speed=speed,
             )
         except Exception as err:
             _LOGGER.debug("Failed to parse status hex %s: %s", hex_str, err)
@@ -316,6 +410,55 @@ class ZenggePayloadBuilder:
     @classmethod
     def query_status(cls) -> bytes:
         return bytes([0x71, 0x23])
+
+    @classmethod
+    def query_status_v2(cls) -> bytes:
+        """Non-destructive HagallBjarkan v2 status query (EA 81 8A 8B 59)."""
+        return bytes.fromhex("EA818A8B59")
+
+    @classmethod
+    def power_on_v2(cls) -> bytes:
+        """Unified Command 2.0 Power ON (Carrier-Wave / common2_0)."""
+        return bytes.fromhex("E001002300000000000000000000")
+
+    @classmethod
+    def power_off_v2(cls) -> bytes:
+        """Unified Command 2.0 Power OFF (Carrier-Wave / common2_0)."""
+        return bytes.fromhex("E001002400000000000000000000")
+
+    @classmethod
+    def set_hsv_carrier_wave(cls, hue: int, saturation: int, brightness: int) -> bytes:
+        """Carrier-Wave Symphony 0xC1 solid color command with 9-bit Hue packing."""
+        hue_clamped = int(round(hue)) % 360
+        h_div2 = hue_clamped >> 1
+        sat_val = max(0, min(100, int(round(saturation))))
+        s_packed = ((hue_clamped & 1) << 7) | sat_val
+        bri = max(1, min(100, int(round(brightness))))
+        return bytes([0xE0, 0x01, 0x00, 0xC1, h_div2, s_packed, bri, 0x00, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00])
+
+    @classmethod
+    def set_rgb_carrier_wave(
+        cls, r: int, g: int, b: int, brightness: Optional[int] = None
+    ) -> bytes:
+        """Convert RGB to 9-bit HSV for Carrier-Wave 0xC1 solid color command."""
+        r_f = max(0, min(255, int(r))) / 255.0
+        g_f = max(0, min(255, int(g))) / 255.0
+        b_f = max(0, min(255, int(b))) / 255.0
+        h, s, v = colorsys.rgb_to_hsv(r_f, g_f, b_f)
+        hue_deg = int(round(h * 360)) % 360
+        sat_pct = int(round(s * 100))
+        bri_pct = max(1, min(100, int(round(brightness)))) if brightness is not None else max(1, int(round(v * 100)))
+        return cls.set_hsv_carrier_wave(hue_deg, sat_pct, bri_pct)
+
+    @classmethod
+    def build_carrier_wave_effect(cls, effect_name: str, brightness: int = 100) -> Optional[bytes]:
+        """Build E1 21 / EC 07 / EC 03 command payload for a Carrier-Wave effect or preset."""
+        canonical = CARRIER_WAVE_EFFECT_BY_KEY.get(effect_name.strip().lower())
+        if not canonical:
+            return None
+        prefix_hex, tail_hex = CARRIER_WAVE_EFFECT_TEMPLATES[canonical]
+        bri = max(1, min(100, int(round(brightness))))
+        return bytes.fromhex(prefix_hex) + bytes([bri]) + bytes.fromhex(tail_hex)
 
     @classmethod
     def set_rgb(cls, r: int, g: int, b: int) -> bytes:
@@ -438,9 +581,19 @@ SCENE_PATTERNS: dict[int, bytes] = {
 class ZenggeLampDevice:
     """Asynchronous device controller interfacing with BleakClient and BLEDevice."""
 
-    def __init__(self, ble_device: Optional[BLEDevice] = None, address: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        ble_device: Optional[BLEDevice] = None,
+        address: Optional[str] = None,
+        product_id: Optional[int] = None,
+        led_version: Optional[int] = None,
+    ) -> None:
         self._ble_device = ble_device
         self._address = (ble_device.address if ble_device else address) or ""
+        self._product_id: Optional[int] = product_id
+        self._led_version: Optional[int] = led_version
+        self._active_carrier_effect: Optional[str] = None
+        self._active_carrier_bri: int = 100
         self.client: Optional[BleakClient] = None
         self._write_char: Optional[BleakGATTCharacteristic] = None
         self._notify_char: Optional[BleakGATTCharacteristic] = None
@@ -450,6 +603,35 @@ class ZenggeLampDevice:
         self._latest_status: Optional[ZenggeDeviceStatus] = None
         self._callbacks: list[Callable[[ZenggeDeviceStatus], None]] = []
         self._lock = asyncio.Lock()
+        self._cmd_lock = asyncio.Lock()
+
+    @property
+    def product_id(self) -> Optional[int]:
+        return self._product_id
+
+    @property
+    def led_version(self) -> Optional[int]:
+        return self._led_version
+
+    @property
+    def is_carrier_wave(self) -> bool:
+        """True if device uses the Gen-3 Carrier-Wave Symphony protocol (e.g. PID 0x00C5)."""
+        return self._product_id in CARRIER_WAVE_PRODUCT_IDS
+
+    @property
+    def active_carrier_effect(self) -> Optional[str]:
+        return self._active_carrier_effect
+
+    @property
+    def active_carrier_brightness(self) -> int:
+        return self._active_carrier_bri
+
+    def set_product_info(self, product_id: Optional[int], led_version: Optional[int] = None) -> None:
+        """Set detected hardware product ID and LED protocol version."""
+        if product_id is not None and product_id > 0:
+            self._product_id = product_id
+        if led_version is not None and led_version > 0:
+            self._led_version = led_version
 
     @property
     def address(self) -> str:
@@ -613,6 +795,12 @@ class ZenggeLampDevice:
                 hex_payload = res.get("payload", "")
                 status = ZenggeDeviceStatus.from_hex_payload(hex_payload)
                 if status:
+                    if status.product_id > 0 and self._product_id is None:
+                        self._product_id = status.product_id
+                    if status.led_version > 0 and self._led_version is None:
+                        self._led_version = status.led_version
+                    if status.product_id in CARRIER_WAVE_PRODUCT_IDS and not status.is_scene_mode:
+                        self._active_carrier_effect = None
                     self._latest_status = status
                     _LOGGER.debug("Parsed telemetry status on %s: power=%s, mode=%s, bri=%s", self._address, status.power, status.mode_name, status.brightness)
                     if self._status_future and not self._status_future.done():
@@ -634,61 +822,90 @@ class ZenggeLampDevice:
         timeout: float = DEFAULT_COMMAND_TIMEOUT,
     ) -> Optional[ZenggeDeviceStatus]:
         """Wrap inner payload into transport frames and transmit over write characteristic."""
-        if not self.is_connected or self.client is None:
-            connected = await self.connect()
-            if not connected or self.client is None:
-                raise BleakError(f"Device {self._address} not connected")
+        async with self._cmd_lock:
+            if not self.is_connected or self.client is None:
+                connected = await self.connect()
+                if not connected or self.client is None:
+                    raise BleakError(f"Device {self._address} not connected")
 
-        # Ensure write characteristic is resolved
-        if not self._write_char:
-            self._resolve_gatt_characteristics()
+            # Ensure write characteristic is resolved
+            if not self._write_char:
+                self._resolve_gatt_characteristics()
 
-        char_specifier = self._write_char or WRITE_UUID
+            char_specifier = self._write_char or WRITE_UUID
 
-        upper = UpperTransportLayer(
-            ack=False,
-            protect=False,
-            type=0,
-            seq=self.next_seq,
-            cmd_id=CMD_ID_APP,
-            payload=payload,
-        )
-        frames = LowerTransportLayerEncoder.generate(upper)
+            upper = UpperTransportLayer(
+                ack=False,
+                protect=False,
+                type=0,
+                seq=self.next_seq,
+                cmd_id=CMD_ID_APP,
+                payload=payload,
+            )
+            frames = LowerTransportLayerEncoder.generate(upper)
 
-        if wait_response:
-            loop = asyncio.get_running_loop()
-            self._status_future = loop.create_future()
+            if wait_response:
+                loop = asyncio.get_running_loop()
+                self._status_future = loop.create_future()
 
-        for frame in frames:
-            await self.client.write_gatt_char(char_specifier, frame, response=False)
-            if len(frames) > 1:
-                await asyncio.sleep(INTER_FRAME_DELAY)
+            for frame in frames:
+                await self.client.write_gatt_char(char_specifier, frame, response=False)
+                if len(frames) > 1:
+                    await asyncio.sleep(INTER_FRAME_DELAY)
 
-        if wait_response and self._status_future:
-            try:
-                status = await asyncio.wait_for(self._status_future, timeout=timeout)
-                return status
-            except asyncio.TimeoutError:
-                _LOGGER.debug("Timed out waiting for response on %s; returning cached state", self._address)
-                return self._latest_status
-            finally:
-                self._status_future = None
+            if wait_response and self._status_future:
+                try:
+                    status = await asyncio.wait_for(self._status_future, timeout=timeout)
+                    return status
+                except asyncio.TimeoutError:
+                    _LOGGER.debug("Timed out waiting for response on %s; returning cached state", self._address)
+                    return self._latest_status
+                finally:
+                    self._status_future = None
 
-        return self._latest_status
+            return self._latest_status
 
     async def power_on(self) -> Optional[ZenggeDeviceStatus]:
+        if self.is_carrier_wave:
+            return await self.send_command(ZenggePayloadBuilder.power_on_v2(), wait_response=True)
         return await self.send_command(ZenggePayloadBuilder.power_on(), wait_response=True)
 
     async def power_off(self) -> Optional[ZenggeDeviceStatus]:
+        if self.is_carrier_wave:
+            # Carrier-Wave devices turn off cleanly via E0010024 without emitting an 0xFF02 notification
+            await self.send_command(ZenggePayloadBuilder.power_off_v2(), wait_response=False)
+            if self._latest_status is not None:
+                self._latest_status = replace(self._latest_status, power=False)
+                for cb in list(self._callbacks):
+                    try:
+                        cb(self._latest_status)
+                    except Exception as cb_err:
+                        _LOGGER.error("Error in status callback: %s", cb_err)
+            return self._latest_status
         return await self.send_command(ZenggePayloadBuilder.power_off(), wait_response=True)
 
     async def query_status(self) -> Optional[ZenggeDeviceStatus]:
+        if self.is_carrier_wave:
+            return await self.send_command(ZenggePayloadBuilder.query_status_v2(), wait_response=True)
         return await self.send_command(ZenggePayloadBuilder.query_status(), wait_response=True)
 
-    async def set_rgb(self, r: int, g: int, b: int) -> Optional[ZenggeDeviceStatus]:
+    async def set_rgb(
+        self, r: int, g: int, b: int, brightness: Optional[int] = None
+    ) -> Optional[ZenggeDeviceStatus]:
+        if self.is_carrier_wave:
+            self._active_carrier_effect = None
+            payload = ZenggePayloadBuilder.set_rgb_carrier_wave(r, g, b, brightness=brightness)
+            return await self.send_command(payload, wait_response=True)
         return await self.send_command(ZenggePayloadBuilder.set_rgb(r, g, b), wait_response=True)
 
     async def set_hsv(self, hue: int, sat: int, bri: int) -> Optional[ZenggeDeviceStatus]:
+        if self.is_carrier_wave:
+            self._active_carrier_effect = None
+            self._active_carrier_bri = max(1, min(100, int(round(bri))))
+            return await self.send_command(
+                ZenggePayloadBuilder.set_hsv_carrier_wave(hue, sat, bri),
+                wait_response=True,
+            )
         return await self.send_command(ZenggePayloadBuilder.set_hsv(hue, sat, bri), wait_response=True)
 
     async def set_hs(self, hue: float, saturation: float, brightness: Optional[int] = None) -> Optional[ZenggeDeviceStatus]:
@@ -696,16 +913,47 @@ class ZenggeLampDevice:
         return await self.set_hsv(int(round(hue)) % 360, int(round(saturation)), int(round(bri)))
 
     async def set_cct(self, cct_percent: int, brightness: int = 100) -> Optional[ZenggeDeviceStatus]:
+        if self.is_carrier_wave:
+            # Map CCT 0% (warm amber) -> 100% (pure white) to Carrier-Wave 0xC1 color
+            cct = max(0, min(100, int(cct_percent)))
+            hue = 21
+            sat = int(round((100 - cct) * 0.95))
+            return await self.set_hsv(hue, sat, brightness)
         return await self.send_command(ZenggePayloadBuilder.set_cct(cct_percent, brightness), wait_response=True)
 
+    async def set_effect_by_name(
+        self, effect_name: str, brightness: int = 100
+    ) -> Optional[ZenggeDeviceStatus]:
+        """Activate a Carrier-Wave built-in effect, multi-color string preset, or music mode by name."""
+        canonical = CARRIER_WAVE_EFFECT_BY_KEY.get(effect_name.strip().lower())
+        payload = ZenggePayloadBuilder.build_carrier_wave_effect(effect_name, brightness=brightness)
+        if payload is None or canonical is None:
+            _LOGGER.warning("Unknown Carrier-Wave effect %s on %s", effect_name, self._address)
+            return await self.power_on()
+        self._active_carrier_effect = canonical
+        self._active_carrier_bri = max(1, min(100, int(round(brightness))))
+        return await self.send_command(payload, wait_response=True)
+
     async def set_brightness(self, brightness_percent: int) -> Optional[ZenggeDeviceStatus]:
+        bri = max(1, min(100, int(round(brightness_percent))))
         status = self._latest_status or await self.query_status()
+        if self.is_carrier_wave:
+            self._active_carrier_bri = bri
+            active_effect = self._active_carrier_effect
+            if not active_effect and status and status.is_scene_mode:
+                active_effect = CARRIER_WAVE_MODE_TO_DEFAULT_NAME.get((status.mode_id, status.sub_mode_id))
+            if active_effect:
+                return await self.set_effect_by_name(active_effect, brightness=bri)
+            hue = status.hue if status else 0
+            sat = status.saturation if status else 0
+            return await self.set_hsv(hue, sat, bri)
+
         if status and status.channel_mode == "RGB":
-            return await self.set_hsv(status.hue, status.saturation, brightness_percent)
+            return await self.set_hsv(status.hue, status.saturation, bri)
         elif status and status.channel_mode == "WHITE":
-            return await self.set_cct(status.cool_white, brightness_percent)
+            return await self.set_cct(status.cool_white, bri)
         else:
-            return await self.set_cct(0, brightness_percent)
+            return await self.set_cct(0, bri)
 
     async def set_scene(
         self,

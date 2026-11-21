@@ -75,6 +75,27 @@ class TestConfigFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn("address", error_result["errors"])
         self.assertEqual(error_result["errors"]["address"], "invalid_mac")
 
+    async def test_bluetooth_discovery_extracts_carrier_wave_product_id(self):
+        flow = ZenggeBLEConfigFlow()
+        flow.hass = MagicMock()
+
+        discovery_info = BluetoothServiceInfoBleak(
+            name="IOTBTD84",
+            address="08:65:F0:41:DD:84",
+            service_uuids=[],
+            service_data={"00005a00-0000-1000-8000-00805f9b34fb": bytes.fromhex("5b070865f041dd8400c543080128")},
+            rssi=-73,
+        )
+
+        result = await flow.async_step_bluetooth(discovery_info)
+        self.assertEqual(result["type"], "form")
+        self.assertEqual(result["step_id"], "bluetooth_confirm")
+
+        confirm_result = await flow.async_step_bluetooth_confirm(user_input={})
+        self.assertEqual(confirm_result["type"], "create_entry")
+        self.assertEqual(confirm_result["data"]["product_id"], 197)
+        self.assertEqual(confirm_result["data"]["led_version"], 8)
+
 
 if __name__ == "__main__":
     unittest.main()

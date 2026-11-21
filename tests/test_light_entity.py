@@ -128,5 +128,67 @@ class TestZenggeLightEntity(unittest.IsolatedAsyncioTestCase):
         self.device.set_brightness.assert_awaited_once_with(50)
 
 
+class TestCarrierWaveLightEntity(unittest.IsolatedAsyncioTestCase):
+    """Test Home Assistant Light Entity for Carrier-Wave string lights (productId 0x00C5)."""
+
+    def setUp(self):
+        self.ble_device = BLEDevice("08:65:F0:41:DD:84", "IOTBTD84", {})
+        self.device = ZenggeLampDevice(ble_device=self.ble_device, product_id=0x00C5, led_version=8)
+        self.device.power_on = AsyncMock()
+        self.device.power_off = AsyncMock()
+        self.device.set_rgb = AsyncMock()
+        self.device.set_hsv = AsyncMock()
+        self.device.set_cct = AsyncMock()
+        self.device.set_brightness = AsyncMock()
+        self.device.set_effect_by_name = AsyncMock()
+
+        self.hass = MagicMock()
+        self.coordinator = ZenggeDataUpdateCoordinator(
+            hass=self.hass,
+            ble_device=self.ble_device,
+            device=self.device,
+        )
+        self.entry = ConfigEntry(
+            unique_id="08:65:F0:41:DD:84",
+            title="Christmas String Lights",
+            data={"address": "08:65:F0:41:DD:84", "name": "IOTBTD84", "product_id": 197, "led_version": 8},
+        )
+        self.entity = ZenggeHBLightEntity(self.coordinator, self.entry)
+
+    def test_capabilities_and_device_info(self):
+        self.assertEqual(self.entity.supported_color_modes, {ColorMode.HS})
+        self.assertEqual(self.entity.color_mode, ColorMode.HS)
+        self.assertIsNone(self.entity.color_temp_kelvin)
+        self.assertEqual(len(self.entity.effect_list), 79)
+        self.assertIn("Christmas1", self.entity.effect_list)
+        self.assertIn("Preset Red & Green", self.entity.effect_list)
+        self.assertEqual(self.entity.device_info["model"], "HagallBjarkan Addressable String Lights")
+        self.assertEqual(self.entity.device_info["sw_version"], "LED v8")
+
+    def test_telemetry_reflection_and_effect_brightness(self):
+        # Static Purple (H=271, S=100, V=100)
+        status = ZenggeDeviceStatus.from_hex_payload("EA810000C508232414500087E4640000000019000000013B010019")
+        self.coordinator.data = status
+        self.assertEqual(self.entity.hs_color, (271.0, 100.0))
+        self.assertEqual(self.entity.brightness, 255)
+        self.assertIsNone(self.entity.effect)
+
+        # Active Christmas1 at 30% effect brightness (device telemetry keeps b[13]=0x64)
+        self.device._active_carrier_effect = "Christmas1"
+        self.device._active_carrier_bri = 30
+        eff_status = ZenggeDeviceStatus.from_hex_payload("EA810000C50823250250000464640000000019000000013B010019")
+        self.coordinator.data = eff_status
+        self.assertEqual(self.entity.effect, "Christmas1")
+        self.assertEqual(self.entity.brightness, int(round(0.30 * 255)))
+
+    async def test_turn_on_carrier_wave_effect(self):
+        await self.entity.async_turn_on(**{ATTR_EFFECT: "Christmas1", ATTR_BRIGHTNESS: 128})
+        self.device.set_effect_by_name.assert_awaited_once_with("Christmas1", brightness=50)
+
+    async def test_turn_on_carrier_wave_rgb_with_brightness(self):
+        await self.entity.async_turn_on(**{ATTR_RGB_COLOR: (255, 0, 0), ATTR_BRIGHTNESS: 51})
+        self.device.set_rgb.assert_awaited_once_with(255, 0, 0, brightness=20)
+
+
 if __name__ == "__main__":
     unittest.main()

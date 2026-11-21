@@ -9,9 +9,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from custom_components.zengge_ble.const import (
+    CARRIER_WAVE_EFFECT_LIST,
     EFFECT_LIST,
     EFFECT_NAME_TO_ID,
     EFFECT_SLUG_TO_ID,
+    PRODUCT_ID_CARRIER_WAVE_STRING,
     SCENE_PRESETS,
 )
 from custom_components.zengge_ble.zengge_protocol import (
@@ -20,6 +22,7 @@ from custom_components.zengge_ble.zengge_protocol import (
     UpperTransportLayer,
     ZenggeDeviceStatus,
     ZenggePayloadBuilder,
+    parse_service_data_product_info,
 )
 
 
@@ -138,6 +141,79 @@ class TestStatusParsing(unittest.TestCase):
         self.assertIn("flame", EFFECT_SLUG_TO_ID)
         self.assertIn("Breathe", EFFECT_NAME_TO_ID)
         self.assertIn("Colorful", EFFECT_NAME_TO_ID)
+
+
+class TestCarrierWaveProtocol(unittest.TestCase):
+    """Test Carrier-Wave Symphony (productId 0x00C5 / IOTBTD84) protocol."""
+
+    def test_parse_service_data_product_info(self):
+        pid, fw, led = parse_service_data_product_info(
+            {"00005a00-0000-1000-8000-00805f9b34fb": bytes.fromhex("5b070865f041dd8400c543080128")}
+        )
+        self.assertEqual(pid, PRODUCT_ID_CARRIER_WAVE_STRING)
+        self.assertEqual(fw, 0x43)
+        self.assertEqual(led, 8)
+
+        pid2, fw2, led2 = parse_service_data_product_info(
+            {"00005a02-0000-1000-8000-00805f9b34fb": bytes.fromhex("5b07e498bb69e537000e330a0100")}
+        )
+        self.assertEqual(pid2, 0x000E)
+        self.assertEqual(fw2, 0x33)
+        self.assertEqual(led2, 10)
+
+    def test_carrier_wave_builders_match_captures(self):
+        self.assertEqual(ZenggePayloadBuilder.query_status_v2(), bytes.fromhex("EA818A8B59"))
+        self.assertEqual(ZenggePayloadBuilder.power_on_v2(), bytes.fromhex("E001002300000000000000000000"))
+        self.assertEqual(ZenggePayloadBuilder.power_off_v2(), bytes.fromhex("E001002400000000000000000000"))
+
+        # Purple 271 deg, 100% sat, 100% bri -> 0x87 0xE4 0x64
+        self.assertEqual(
+            ZenggePayloadBuilder.set_hsv_carrier_wave(271, 100, 100),
+            bytes.fromhex("E00100C187E46400000000140000"),
+        )
+        # Warm White 21 deg, 95% sat, 100% bri -> 0x0A 0xDF 0x64
+        self.assertEqual(
+            ZenggePayloadBuilder.set_hsv_carrier_wave(21, 95, 100),
+            bytes.fromhex("E00100C10ADF6400000000140000"),
+        )
+        # Christmas1 @ 30% brightness
+        self.assertEqual(
+            ZenggePayloadBuilder.build_carrier_wave_effect("Christmas1", brightness=30),
+            bytes.fromhex("E121001E02000150500000000000000300646400003C646400000000640000"),
+        )
+        # Multi-color string preset @ 100% brightness
+        self.assertEqual(
+            ZenggePayloadBuilder.build_carrier_wave_effect("Red & Green", brightness=100),
+            bytes.fromhex("EC0700640200646400003C64640000"),
+        )
+        self.assertEqual(len(CARRIER_WAVE_EFFECT_LIST), 79)
+
+    def test_parse_carrier_wave_telemetry(self):
+        # Solid Purple 271 deg, 100% sat, 100% bri, 25 points
+        status = ZenggeDeviceStatus.from_hex_payload("EA810000C508232414500087E4640000000019000000013B010019")
+        self.assertIsNotNone(status)
+        self.assertEqual(status.product_id, 197)
+        self.assertEqual(status.led_version, 8)
+        self.assertTrue(status.power)
+        self.assertEqual(status.channel_mode, "RGB")
+        self.assertEqual(status.hue, 271)
+        self.assertEqual(status.saturation, 100)
+        self.assertEqual(status.brightness, 100)
+        self.assertEqual(status.point_count, 25)
+        self.assertFalse(status.is_scene_mode)
+
+        # Built-in Effect Christmas1 (mode 0x25, sub_mode 0x02, speed 0x50)
+        eff_status = ZenggeDeviceStatus.from_hex_payload("EA810000C50823250250006BCE5D005D000019000000013B010019")
+        self.assertIsNotNone(eff_status)
+        self.assertTrue(eff_status.is_scene_mode)
+        self.assertEqual(eff_status.mode_id, 0x25)
+        self.assertEqual(eff_status.sub_mode_id, 0x02)
+        self.assertEqual(eff_status.speed, 0x50)
+
+        # String Preset mode 0x24 sub_mode 0x01
+        preset_status = ZenggeDeviceStatus.from_hex_payload("EA810000C50823240150003C64640000000019000000013B010019")
+        self.assertIsNotNone(preset_status)
+        self.assertTrue(preset_status.is_scene_mode)
 
 
 if __name__ == "__main__":

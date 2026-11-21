@@ -195,10 +195,19 @@ class ConfigFlow:
 
 
 class BluetoothServiceInfoBleak:
-    def __init__(self, name="IOTBT537", address="AA:BB:CC:DD:EE:FF", service_uuids=None, rssi=-60, device=None):
+    def __init__(
+        self,
+        name="IOTBT537",
+        address="AA:BB:CC:DD:EE:FF",
+        service_uuids=None,
+        service_data=None,
+        rssi=-60,
+        device=None,
+    ):
         self.name = name
         self.address = address
-        self.service_uuids = service_uuids or ["0000ffff-0000-1000-8000-00805f9b34fb"]
+        self.service_uuids = service_uuids if service_uuids is not None else ["0000ffff-0000-1000-8000-00805f9b34fb"]
+        self.service_data = service_data or {}
         self.rssi = rssi
         self.device = device
 
@@ -286,6 +295,7 @@ def install_mock_ha():
     ha_components_bt.BluetoothScanningMode = BluetoothScanningMode
     ha_components_bt.async_discovered_service_info = lambda hass, connectable=True: []
     ha_components_bt.async_ble_device_from_address = lambda hass, addr, connectable=True: None
+    ha_components_bt.async_last_service_info = lambda hass, addr, connectable=True: None
     ha_components_bt.async_register_callback = lambda hass, cb, matcher, mode: lambda: None
 
     ha_components_bt_match = types.ModuleType("homeassistant.components.bluetooth.match")

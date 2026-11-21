@@ -298,3 +298,39 @@ Raw JSON Payload: "EA8100000E0A246102400F000000646400000000000000000000"
 - **Pairing Requirement**: Default Zengge HagallBjarkan devices accept unauthenticated, unbonded connections over standard BLE advertising.
 - **Transport Encryption**: Frames have `is_protect = 0` (plaintext payload encapsulation).
 - **Session Sequence**: Sequential `Seq` numbers starting at `0x01` are tracked per connection instance.
+
+---
+
+## 8. Gen-3 Carrier-Wave Symphony Extension (`Product ID 0x00C5` / `IOTBTD84`)
+
+Addressable string light controllers (`wifibleCarrierWaveSymphony`, category `hc3`, e.g. `IOTBTD84` with PHY6252 `0x5A5B`, `productId=0x00C5`, `ledVersion=8`, 25 LEDs) use the same `0xFFFF` / `0xFF01` / `0xFF02` GATT profile and `0x8000` Lower Transport Layer framing, with the following application-layer extensions:
+
+### 8.1 Advertisement Service Data (`0x5A00` / `0x5A02`)
+`5B 07 <6B MAC> <2B ProductID BE> <1B FirmwareVer> <1B LedVersion> <2B Flags>`
+- Example (`IOTBTD84`): `5b 07 08 65 f0 41 dd 84 00 c5 43 08 01 28` → `productId = 0x00C5` (`197`), `firmwareVer = 0x43` (`67`), `ledVersion = 0x08` (`8`).
+
+### 8.2 9-Bit Hue Tuple Encoding (5 Bytes)
+Color tuples across `0xC1`, `EC 07`, `E1 21`, and `EC 03` pack 0–359° Hue using 9 bits:
+- Byte `0`: `hue >> 1` (`0..179`)
+- Byte `1`: `((hue & 1) << 7) | saturation` (`saturation` `0..100`)
+- Byte `2`: `brightness` (`0..100`)
+- Bytes `3..4`: `0x00, 0x00`
+
+### 8.3 Carrier-Wave Commands (`CmdID = 0x0A`)
+- **Status Query**: `EA 81 8A 8B 59` (checksum `0x59`).
+- **Power ON / OFF**: `E0 01 00 23 00 00 00 00 00 00 00 00 00 00` / `E0 01 00 24 00 00 00 00 00 00 00 00 00 00` (note: Power OFF turns off silently without an `0xFF02` notification).
+- **Solid Color (`0xC1`)**: `E0 01 00 C1 [H>>1] [((H&1)<<7)|S] [V] 00 00 00 00 14 00 00`.
+- **Multi-Color String Presets (`EC 07`)**: `EC 07 00 [Bri] [Count] [Count × 5B ColorTuple]`.
+- **Built-in Dynamic Effects (`E1 21`)**: `E1 21 00 [Bri] [ModeID] [Dir] [Step] [Param] [Speed] 00 [BG 5B] [Count] [Count × 5B ColorTuple]`.
+- **Device-Mic Music Modes (`EC 03`)**: `EC 03 00 [Bri] [Mode 1..6] 00 [Sensitivity] [Count] [Count × 5B ColorTuple]`.
+- **Per-Pixel Smudge (`E1 23`, multi-segment `ctrl=0x40`)**: `E1 23 01 [Anim] 00 00 [Bri] 00 [PointCount=0x19] [25 × 7B per-LED tuples]`.
+
+### 8.4 Carrier-Wave 27-Byte Status Telemetry (`EA810000C508...`)
+- `b[0..1]`: `EA 81`, `b[3..4]`: `00 C5` (`productId = 197`), `b[5]`: `08` (`ledVersion = 8`)
+- `b[6]`: Power (`0x23` = ON, `0x24` = OFF)
+- `b[7]`: Mode (`0x24` = Static Color / String Preset, `0x25` = Built-in `E1 21` Effect, `0x62` = Music `EC 03`, `0x66` = Custom Smudge `E1 23`)
+- `b[8]`: Sub-mode (`0x14` = Solid `0xC1`, `0x01` = String Preset `EC 07`, or Effect/Music/Anim ID)
+- `b[9]`: Effect speed (`0..100`)
+- `b[10]`: `0x00`
+- `b[11..13]`: Current/last 9-bit HSV tuple (`H>>1`, `((H&1)<<7)|S`, `V`)
+- `b[18]`: Addressable point count (`0x19` = 25 LEDs)
